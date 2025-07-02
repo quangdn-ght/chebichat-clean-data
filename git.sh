@@ -37,9 +37,9 @@ git commit -m "$COMMIT_MESSAGE"
 check_status "Initial commit"
 
 # Step 4: Add remote origin
-# echo "🔗 Step 4: Adding remote repository..."
-# git remote add origin "$REPO_URL"
-# check_status "Adding remote origin"
+echo "🔗 Step 4: Adding remote repository..."
+git remote add origin "$REPO_URL"
+check_status "Adding remote origin"
 
 # Step 5: Push to GitHub
 echo "⬆️ Step 5: Pushing to GitHub repository..."
