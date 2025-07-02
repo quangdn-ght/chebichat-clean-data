@@ -1,4 +1,4 @@
-const { ChineseTextProcessor, HSKAnalyzer, PinyinGenerator, DataMerger } = require('./index');
+const { ChineseTextProcessor, HSKAnalyzer, PinyinGenerator, DataMerger } = require('../index');
 
 /**
  * Test the Chinese Text Processor package

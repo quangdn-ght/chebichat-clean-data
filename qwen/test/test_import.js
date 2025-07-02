@@ -1,4 +1,4 @@
-const { DataMerger } = require('./index');
+const { DataMerger } = require('../index');
 const fs = require('fs').promises;
 
 async function testImportJson() {

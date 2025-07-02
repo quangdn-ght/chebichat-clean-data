@@ -1,2 +1,5 @@
 lib/hsk_standard_course_vocab
 lib/hsk_standard_course_vocab
+qwen/node_modules/*
+qwen/node_modules/.bin/openai
+qwen/output/*

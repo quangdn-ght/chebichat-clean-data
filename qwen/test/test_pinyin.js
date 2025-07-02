@@ -1,4 +1,4 @@
-const { PinyinGenerator } = require('./index');
+const { PinyinGenerator } = require('../index');
 
 console.log('🔤 Testing Pinyin Generation with pinyin-pro');
 console.log('=============================================\n');
