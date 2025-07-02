@@ -9,7 +9,7 @@ echo "=================================================="
 
 # Variables
 REPO_URL="https://github.com/quangdn-ght/chebichat-clean-data.git"
-COMMIT_MESSAGE="Toi uu he thong bieu do tien trinh v2 - fix: cai thien xu ly va hien thi du lieu thoi gian"
+COMMIT_MESSAGE="khoi tao du an chebichat clean data"
 
 # Function to check if command was successful
 check_status() {
@@ -48,7 +48,7 @@ check_status "Pushing to GitHub"
 
 echo ""
 echo "🎉 Repository setup completed successfully!"
-echo "📍 Repository URL: $REPO_URL"
+echo "📍 Repository URL: $REPO_URL"clean-data
 echo "🌟 Your project is now live on GitHub!"
 
 # Display repository status
