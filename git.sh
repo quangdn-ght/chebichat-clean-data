@@ -43,7 +43,7 @@ check_status "Adding remote origin"
 
 # Step 5: Push to GitHub
 echo "⬆️ Step 5: Pushing to GitHub repository..."
-git push -u origin main
+git push -u origin master
 check_status "Pushing to GitHub"
 
 echo ""
