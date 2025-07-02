@@ -38,7 +38,7 @@ check_status "Initial commit"
 
 # Step 4: Add remote origin
 echo "🔗 Step 4: Adding remote repository..."
-git remote add origin "$REPO_URL"
+# git remote add origin "$REPO_URL"
 check_status "Adding remote origin"
 
 # Step 5: Push to GitHub
