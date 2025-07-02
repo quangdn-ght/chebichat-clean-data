@@ -1,0 +1,22 @@
+{
+  "name": "cleandata",
+  "version": "1.0.0",
+  "description": "",
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "fs": "^0.0.1-security",
+    "nodejieba": "^3.4.4",
+    "path": "^0.12.7",
+    "pinyin": "^4.0.0",
+    "pinyin-pro": "^3.26.0"
+  },
+  "devDependencies": {
+    "mocha": "^11.5.0"
+  }
+}

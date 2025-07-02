@@ -1,0 +1,314 @@
+const fs = require('fs');
+const path = require('path');
+
+/**
+ * 1. step1 – Tách đoạn văn bản thành các phần nhỏ
+Mục đích: Đọc file .txt, chia nội dung theo đoạn (dựa vào hai dòng trống), lọc và lưu dưới dạng JSON.
+
+Tính năng chính:
+
+Phân đoạn văn bản tự động.
+Làm sạch dữ liệu đầu vào.
+Lưu trữ dưới định dạng JSON dễ xử lý.
+ */
+// Step 1: Read the input file
+const step1 = () => {
+  const filePath = '999.txt';
+  const content = fs.readFileSync(filePath, 'utf-8');
+
+  // Chia đoạn bằng `\n\n`
+  let sections = content.split(/\n\s*\n/);
+
+  // Loại bỏ khoảng trắng và đoạn rỗng
+  sections = sections.map(section => section.trim()).filter(section => section.length > 0);
+
+  // Ghi kết quả ra output.json
+  const outputFilePath = 'output.json';
+  fs.writeFileSync(outputFilePath, JSON.stringify(sections, null, 2), 'utf-8');
+
+  console.log(`✅ Thành công: ${sections.length} phần đã được lưu vào ${outputFilePath}`);
+};
+
+
+// const fs = require('fs');
+/**
+ * 2. findChineseSequences(str) – Trích xuất chuỗi chữ Hán
+Mục đích: Tìm tất cả các chuỗi chữ Hán trong một chuỗi đầu vào.
+  * Tính năng chính:
+
+Nhận diện chữ Hán bằng biểu thức chính quy.
+Trả về vị trí bắt đầu/kết thúc của từng chuỗi tìm thấy.
+
+ * Tìm kiếm các chuỗi tiếng Trung trong văn bản.
+ * @param {string} str - Văn bản đầu vào.
+ * @returns {Array} - Danh sách các chuỗi tiếng Trung tìm thấy.
+ */
+function findChineseSequences(str) {
+  const regex = /[\u4e00-\u9fff]+/g; // CJK Unified Ideographs
+  const results = [];
+  let match;
+
+  while ((match = regex.exec(str)) !== null) {
+    results.push({
+      text: match[0],
+      start: match.index,
+      end: match.index + match[0].length
+    });
+  }
+
+  return results;
+}
+
+/**
+ 
+ * 3. step2 – Phân tách văn bản thành ba phần: Việt - Trung - Pinyin
+Mục đích: Dùng để phân tích từng đoạn văn bản có chứa tiếng Việt, Trung và Pinyin.
+ */
+const step2 = () => {
+  const inputFilePath = 'output3.json';
+  const outputFilePath = 'step3.json';
+
+  // Helper to trim and remove all newlines
+  const sanitize = (str) => (str ? str.trim().replace(/\n/g, '') : null);
+
+  // Read sections from output.json
+  const raw = fs.readFileSync(inputFilePath, 'utf-8');
+  const sections = JSON.parse(raw);
+
+  const result = [];
+
+  // Process each section
+  sections.forEach((section) => {
+    const chineseSequences = findChineseSequences(section);
+
+    if (chineseSequences.length === 0) {
+      result.push({
+        vietnamese: sanitize(section),
+        chinese: null,
+        pinyin: null
+      });
+      return;
+    }
+
+    const firstStart = chineseSequences[0].start;
+    const lastEnd = chineseSequences[chineseSequences.length - 1].end;
+
+    const vietnamese = section.slice(0, firstStart);
+    const chinese = section.slice(firstStart, lastEnd);
+    const pinyin = section.slice(lastEnd);
+
+    result.push({
+      vietnamese: sanitize(vietnamese),
+      chinese: sanitize(chinese)
+      //   pinyin: sanitize(pinyin)
+    });
+  });
+
+  // Write structured result to step2.json
+  fs.writeFileSync(outputFilePath, JSON.stringify(result, null, 2), 'utf-8');
+
+  console.log(`✅ Successfully processed ${result.length} sections and saved to ${outputFilePath}`);
+};
+// Run step1
+// step2();
+
+/**
+ * step3 – Chuẩn hóa sang định dạng {vietnamese, chinese}
+Mục đích: Giữ lại chỉ hai trường cần thiết là tiếng Việt và tiếng Trung.
+  * Tính năng chính:
+
+
+Giản lược dữ liệu không cần thiết.
+Chuẩn hóa cấu trúc dữ liệu cho bước tiếp theo.
+ */
+const step3 = () => {
+  const inputFilePath = 'step2_2.json';
+  const outputFilePath = 'step3.json';
+
+  // Step 1: Read the JSON data
+  const raw = fs.readFileSync(inputFilePath, 'utf-8');
+  const data = JSON.parse(raw);
+
+  // Step 2: Map to new format { vietnamese, chinese }
+  const result = data.map(item => ({
+    vietnamese: item.vietnamese || null,
+    chinese: item.chinese || null
+  }));
+
+  // Step 3: Write structured result to step3.json
+  fs.writeFileSync(outputFilePath, JSON.stringify(result, null, 2), 'utf-8');
+
+  console.log(`✅ Successfully processed ${result.length} entries and saved to ${outputFilePath}`);
+};
+
+//merge all json files in ./result to total.json
+const step4 = () => {
+  const resultDir = './result';
+  const outputFile = 'total.json';
+
+  // Step 1: Read all JSON files in ./result
+  const files = fs.readdirSync(resultDir).filter(file => file.endsWith('.json'));
+
+  let mergedData = [];
+
+  // Step 2: Merge content of each file
+  files.forEach(file => {
+    const filePath = path.join(resultDir, file);
+    const rawData = fs.readFileSync(filePath, 'utf-8');
+    const jsonData = JSON.parse(rawData);
+
+    if (Array.isArray(jsonData)) {
+      mergedData = mergedData.concat(jsonData);
+    } else {
+      console.warn(`⚠️ File ${file} does not contain a JSON array. Skipping.`);
+    }
+  });
+
+  // Step 3: Write merged data to total.json
+  fs.writeFileSync(outputFile, JSON.stringify(mergedData, null, 2), 'utf-8');
+
+  console.log(`✅ Successfully merged ${files.length} files into ${outputFile}`);
+};
+
+// step4();
+
+
+/**
+ 
+ * 5. step6 – Gán mức độ HSK cho từ vựng Trung Quốc
+Mục đích: Sử dụng từ điển HSK để nhóm các từ theo cấp độ.
+Tính năng chính:
+
+Gán mức độ khó dựa trên từ điển HSK.
+Nhóm từ theo cấp độ từ thấp đến cao.
+Gán nhãn other cho những từ chưa xác định.
+
+ */
+// Step 6: Process HSK vocabulary and group by levels
+const step6 = () => {
+  const hskMapPath = './refer/hsk.json';
+  const inputFilePath = './result_with_pinyin.json';
+  const outputFilePath = 'level.json';
+
+  // Step 1: Load HSK character-level mapping
+  const hskRaw = fs.readFileSync(hskMapPath, 'utf-8');
+  const hskVocabList = JSON.parse(hskRaw);
+
+  // Build a map: word -> hsk_level
+  const wordToLevel = {};
+  hskVocabList.forEach(entry => {
+    wordToLevel[entry.word] = entry.hsk_level;
+  });
+
+  // Step 2: Load input data
+  const inputRaw = fs.readFileSync(inputFilePath, 'utf-8');
+  const inputData = JSON.parse(inputRaw);
+
+  // Step 3: Process each entry
+  const result = inputData.map(entry => {
+    const chineseText = entry.original || '';
+    const sequences = findChineseSequences(chineseText);
+    // Grouped by hsk level
+    const grouped = {};
+
+    sequences.forEach(seq => {
+      const {
+        text
+      } = seq;
+      let i = 0;
+      while (i < text.length) {
+        let found = false;
+        for (let j = 10; j > 0; j--) {
+          const sub = text.slice(i, i + j);
+          const level = wordToLevel[sub];
+          if (level) {
+            const key = `hsk${level}`;
+            if (!grouped[key]) grouped[key] = [];
+            grouped[key].push(sub);
+            i += j;
+            found = true;
+            break;
+          }
+        }
+        if (!found) {
+          // Not found in HSK, skip or group as "other"
+          if (!grouped.other) grouped.other = [];
+          grouped.other.push(text[i]);
+          i++;
+        }
+      }
+    });
+
+    // Sort grouped keys by HSK level number and remove duplicates in each group
+    const sortedGrouped = {};
+    Object.keys(grouped)
+      .sort((a, b) => {
+        if (a === 'other') return 1;
+        if (b === 'other') return -1;
+        return Number(a.replace('hsk', '')) - Number(b.replace('hsk', ''));
+      })
+      .forEach(key => {
+        // Remove duplicates and keep only unique characters/words
+        sortedGrouped[key] = Array.from(new Set(grouped[key]));
+      });
+
+    return {
+      original: chineseText,
+      words: sortedGrouped,
+      pinyin: entry.pinyin || null,
+      vietnamese: entry.vietnamese || null
+    };
+  });
+
+  // Step 4: Write structured result to level.json
+  fs.writeFileSync(outputFilePath, JSON.stringify(result, null, 2), 'utf-8');
+
+  console.log(`✅ Successfully processed ${result.length} entries and saved to ${outputFilePath}`);
+};
+
+step6();
+
+
+// const fs = require('fs');
+// const path = require('path');
+
+//them pinyin-pro package
+const {
+  pinyin
+} = require('pinyin-pro'); // Correct import
+
+/**
+ * step7 – Thêm chú âm Pinyin cho từ Trung Quốc
+Mục đích: Sử dụng thư viện pinyin-pro để thêm chú âm Pinyin.
+Tính năng chính:
+
+Tự động sinh chú âm Pinyin.
+Định dạng âm điệu đầy đủ (có dấu).
+ */
+function step7() {
+  const filePath = path.resolve(__dirname, 'result.json');
+  const rawData = fs.readFileSync(filePath, 'utf-8');
+  const data = JSON.parse(rawData);
+
+  const updatedData = data.map(item => {
+    const chineseText = item.original || '';
+    const pinyinResult = pinyin(chineseText, {
+      toneType: 'symbol',
+      type: 'array'
+    }).join(' ');
+
+    return {
+      ...item,
+      pinyin: pinyinResult
+    };
+  });
+
+  const outputFilePath = path.resolve(__dirname, 'result_with_pinyin.json');
+  fs.writeFileSync(outputFilePath, JSON.stringify(updatedData, null, 2), 'utf-8');
+
+  console.log(`Pinyin conversion complete. Output saved to ${outputFilePath}`);
+}
+// step7();
+
+// Step8: Merge duplicate entries in result_with_pinyin.json
+// ...existing code...

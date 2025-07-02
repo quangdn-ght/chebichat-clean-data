@@ -1,0 +1,99 @@
+{
+  "metadata": {
+    "processedAt": "2025-07-01T02:35:12.582Z",
+    "totalItems": 1,
+    "successfulItems": 1,
+    "failedItems": 0,
+    "summary": {
+      "totalWords": 4,
+      "hskDistribution": {
+        "hsk1": 2,
+        "hsk2": 1,
+        "hsk3": 0,
+        "hsk4": 0,
+        "hsk5": 1,
+        "hsk6": 0,
+        "other": 0
+      },
+      "categories": {
+        "life": 1
+      },
+      "sources": {
+        "999 letters to yourself": 1
+      },
+      "averageLength": 13,
+      "languageCoverage": {
+        "hasVietnamese": 1,
+        "hasPinyin": 1
+      },
+      "hskPercentages": {
+        "hsk1": "50.0",
+        "hsk2": "25.0",
+        "hsk3": "0.0",
+        "hsk4": "0.0",
+        "hsk5": "25.0",
+        "hsk6": "0.0",
+        "other": "0.0"
+      }
+    }
+  },
+  "data": [
+    {
+      "original": "别人在熬夜的时候，你在睡觉",
+      "words": {
+        "hsk1": [
+          "时候",
+          "睡觉"
+        ],
+        "hsk2": [
+          "别人"
+        ],
+        "hsk3": [],
+        "hsk4": [],
+        "hsk5": [
+          "熬夜"
+        ],
+        "hsk6": [],
+        "other": []
+      },
+      "pinyin": "bié rén zài áo yè de shí hòu ， nǐ zài shuì jiào",
+      "vietnamese": "Trong lúc người khác thức khuya, bạn đi ngủ",
+      "category": "life",
+      "source": "999 letters to yourself",
+      "processed": true,
+      "statistics": {
+        "total": 4,
+        "byLevel": {
+          "hsk1": 2,
+          "hsk2": 1,
+          "hsk3": 0,
+          "hsk4": 0,
+          "hsk5": 1,
+          "hsk6": 0,
+          "other": 0
+        },
+        "coverage": {
+          "hsk1": "50.0",
+          "hsk2": "25.0",
+          "hsk3": "0.0",
+          "hsk4": "0.0",
+          "hsk5": "25.0",
+          "hsk6": "0.0",
+          "other": "0.0"
+        }
+      },
+      "textStats": {
+        "characterCount": 13,
+        "wordCount": 4,
+        "uniqueWordCount": 4,
+        "averageWordLength": 2,
+        "vocabulary": {
+          "别人": 1,
+          "熬夜": 1,
+          "时候": 1,
+          "睡觉": 1
+        }
+      }
+    }
+  ]
+}

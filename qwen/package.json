@@ -1,0 +1,22 @@
+{
+  "name": "chinese-text-processor",
+  "version": "1.0.0",
+  "description": "A package for processing Chinese text and analyzing HSK word levels",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "node test.js"
+  },
+  "keywords": [
+    "chinese",
+    "hsk",
+    "text-processing",
+    "language-learning"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "nodejieba": "^2.6.0",
+    "pinyin-pro": "^3.26.0"
+  }
+}
