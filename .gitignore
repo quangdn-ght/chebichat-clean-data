@@ -4,3 +4,4 @@ qwen/node_modules/*
 qwen/node_modules/.bin/openai
 qwen/output/*
 qwen/input/*
+qwen/dictionary/output*/*

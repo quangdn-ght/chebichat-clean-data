@@ -9,7 +9,7 @@ dotenv.config();
 // Configuration from environment variables with defaults
 const config = {
     apiKey: process.env.DASHSCOPE_API_KEY,
-    batchSize: parseInt(process.env.BATCH_SIZE) || 100,
+    batchSize: parseInt(process.env.BATCH_SIZE) || 20,
     batchDelay: parseInt(process.env.BATCH_DELAY) || 2000
 };
 
@@ -92,15 +92,15 @@ async function processBatch(batch, batchIndex) {
     try {
         console.log(`Processing batch ${batchIndex + 1} with ${batch.length} items...`);
         
+        // Record start time
+        const startTime = Date.now();
+        
         const completion = await openai.chat.completions.create({
             model: "qwen-max",
             messages: [
                 // SYSTEM
-                {
-                    "role": "system",
-                    "content": "Bạn là một trợ lý dạy tiếng Trung cho người Việt, chuyên giúp học sinh ghi nhớ mặt chữ Hán thông qua các câu thơ, ví dụ hình ảnh, hoặc cách ghi nhớ ngắn gọn và dễ hiểu.\n\nNhiệm vụ của bạn:\n\nDịch các mô tả hình ảnh hoặc gợi ý nhớ chữ Hán sang các câu thơ ngắn gọn, dễ nhớ.\n\nCâu thơ cần mang tính hình tượng, dễ hình dung, tối đa 2 câu. ưu tiên thơ lục bát hoặc thơ đường thất ngôn.\n\nKết quả xuất ra dạng JSON, mỗi chữ Hán là một object với từ gợi ý thơ tương ứng. "
-                },
-                
+                {"role":"system","content":"Bạn là một chuyên gia dịch thuật từ điển tiếng Trung – tiếng Việt, có kinh nghiệm dạy học sinh Việt Nam. Mục tiêu là giúp học sinh hiểu và ghi nhớ từ vựng tiếng Trung dễ dàng, thông qua:\\n\\nDịch nghĩa ví dụ sang tiếng Việt (chính) và tiếng anh (phụ).\\n\\nGiải nghĩa từ đơn giản, dễ hiểu.\\n\\nCung cấp ví dụ cụ thể bằng tiếng Trung và dịch nghĩa.\\n\\nGiải thích ngữ pháp nếu từ đó có đặc điểm ngữ pháp đặc biệt (từ loại, cách dùng, vị trí trong câu...). Xuất kết quả theo dạng JSON, \\n\\nVí dụ Output mẫu:\\n  {\\n    \"chinese\": \"爱护\",\\n    \"pinyin\": \"ài hù\",\\n    \"type\": \"động từ\",\\n    \"meaning_vi\": \"Yêu thương và bảo vệ, chăm sóc một cách cẩn thận (con người, động vật, tài sản...)\",\\n    \"meaning_en\": \"To cherish and protect carefully (people, animals, property, etc.).\",\\n    \"example_cn\": \"我们要爱护环境。\",\\n    \"example_vi\": \"Chúng ta cần phải bảo vệ môi trường.\",\\n    \"example_en\": \"We need to protect the environment.\",\\n    \"grammar\": \"Là động từ hai âm tiết, thường đi kèm với đối tượng cụ thể phía sau. Ví dụ: 爱护公物 (bảo vệ tài sản công cộng), 爱护孩子 (yêu thương trẻ em).\"\\n  }"},
+
                 // USER
                 {
                     "role": "user",
@@ -111,6 +111,13 @@ async function processBatch(batch, batchIndex) {
             temperature: 0.7
         });
 
+        // Calculate response time
+        const endTime = Date.now();
+        const responseTimeMs = endTime - startTime;
+        const responseTimeSeconds = (responseTimeMs / 1000).toFixed(2);
+        
+        console.log(`✓ Batch ${batchIndex + 1} completed in ${responseTimeSeconds}s (${responseTimeMs}ms)`);
+
         // Extract the JSON response from the completion
         const responseContent = completion.choices[0].message.content;
         
@@ -119,8 +126,9 @@ async function processBatch(batch, batchIndex) {
         try {
             const jsonResponse = extractJsonFromResponse(responseContent);
             parsedResponse = JSON.parse(jsonResponse);
+            console.log(`✓ Successfully parsed JSON response for batch ${batchIndex + 1}`);
         } catch (parseError) {
-            console.error(`Failed to parse JSON response for batch ${batchIndex + 1}:`, parseError);
+            console.error(`✗ Failed to parse JSON response for batch ${batchIndex + 1}:`, parseError);
             console.error(`Raw response length: ${responseContent.length}`);
             console.error(`Raw response (first 500 chars): ${responseContent.substring(0, 500)}`);
             // If parsing fails, save the raw response for inspection
@@ -129,16 +137,27 @@ async function processBatch(batch, batchIndex) {
                 parseError: parseError.message,
                 rawResponse: responseContent,
                 extractedJson: extractJsonFromResponse(responseContent),
-                batch: batch
+                batch: batch,
+                responseTime: responseTimeSeconds
+            };
+        }
+
+        // Add response time to the result for tracking
+        if (parsedResponse && typeof parsedResponse === 'object' && !parsedResponse.error) {
+            parsedResponse._metadata = {
+                responseTime: responseTimeSeconds,
+                batchIndex: batchIndex + 1,
+                timestamp: new Date().toISOString()
             };
         }
 
         return parsedResponse;
     } catch (error) {
-        console.error(`Error processing batch ${batchIndex + 1}:`, error);
+        console.error(`✗ Error processing batch ${batchIndex + 1}:`, error);
         return {
             error: error.message,
-            batch: batch
+            batch: batch,
+            timestamp: new Date().toISOString()
         };
     }
 }
@@ -154,9 +173,48 @@ async function saveResults(results, filename) {
     }
 }
 
+// Function to append results to a single JSON file
+async function appendToJsonFile(newData, filename) {
+    const outputPath = path.join('./output', filename);
+    try {
+        let existingData = [];
+        
+        // Read existing file if it exists
+        try {
+            const existingContent = await fs.readFile(outputPath, 'utf8');
+            if (existingContent.trim()) {
+                existingData = JSON.parse(existingContent);
+                // Ensure it's an array
+                if (!Array.isArray(existingData)) {
+                    existingData = [];
+                }
+            }
+        } catch (readError) {
+            // File doesn't exist yet, start with empty array
+            console.log(`Creating new file: ${outputPath}`);
+        }
+        
+        // Append new data
+        if (Array.isArray(newData)) {
+            existingData.push(...newData);
+        } else {
+            existingData.push(newData);
+        }
+        
+        // Write back to file
+        await fs.writeFile(outputPath, JSON.stringify(existingData, null, 2), 'utf8');
+        console.log(`Appended ${Array.isArray(newData) ? newData.length : 1} items to ${outputPath}. Total: ${existingData.length} items.`);
+        
+        return existingData.length;
+    } catch (error) {
+        console.error(`Error appending to ${outputPath}:`, error);
+        throw error;
+    }
+}
+
 // Function to check if batch result already exists
 async function batchExists(batchIndex, totalBatches) {
-    const filename = `radical_suggest_batch_${batchIndex + 1}_of_${totalBatches}.json`;
+    const filename = `dict_batch_${batchIndex + 1}_of_${totalBatches}.json`;
     const outputPath = path.join('./output', filename);
     try {
         await fs.access(outputPath);
@@ -168,16 +226,19 @@ async function batchExists(batchIndex, totalBatches) {
 
 async function main() {
     try {
+        // Ensure output directory exists
+        await fs.mkdir('./output', { recursive: true });
+        
         // Read input data
         console.log('Reading input data...');
-        const inputPath = './input/radical-suggest.json';
+        const inputPath = './input/dict-full.json';
         const inputData = JSON.parse(await fs.readFile(inputPath, 'utf8'));
         
         console.log(`Loaded ${inputData.length} items from ${inputPath}`);
         
-        // Split data into batches using configurable batch size
-        const batches = chunkArray(inputData, config.batchSize);
-        console.log(`Split into ${batches.length} batches of ${config.batchSize} items`);
+        // Split data into batches of 20 items
+        const batches = chunkArray(inputData, 20);
+        console.log(`Split into ${batches.length} batches of 20 items`);
         
         const allResults = [];
         let processedCount = 0;
@@ -203,8 +264,17 @@ async function main() {
             });
             
             // Save intermediate results after each batch
-            const intermediateFilename = `radical_suggest_batch_${i + 1}_of_${batches.length}.json`;
+            const intermediateFilename = `dict_batch_${i + 1}_of_${batches.length}.json`;
             await saveResults(batchResult, intermediateFilename);
+            
+            // Append results to main output file
+            if (Array.isArray(batchResult)) {
+                await appendToJsonFile(batchResult, 'dict-processed.json');
+            } else if (batchResult && !batchResult.error) {
+                await appendToJsonFile(batchResult, 'dict-processed.json');
+            } else {
+                console.log(`Skipping append for batch ${i + 1} due to error or invalid result`);
+            }
             
             processedCount += batches[i].length;
             
@@ -216,7 +286,7 @@ async function main() {
         }
         
         // Save complete results
-        const completeFilename = `radical_suggest_complete_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+        const completeFilename = `dict_complete_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
         await saveResults(allResults, completeFilename);
         
         console.log(`Processing completed successfully! Processed ${processedCount}/${inputData.length} items.`);
