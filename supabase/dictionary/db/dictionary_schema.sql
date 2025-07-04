@@ -14,10 +14,10 @@ CREATE TYPE word_type AS ENUM (
 
 -- Main dictionary table
 CREATE TABLE dictionary (
-  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  -- Use Chinese as primary key for optimal performance
+  chinese VARCHAR(100) PRIMARY KEY,
   
   -- Core Chinese data
-  chinese VARCHAR(100) NOT NULL,
   pinyin VARCHAR(200) NOT NULL,
   
   -- Word classification
@@ -46,8 +46,7 @@ CREATE TABLE dictionary (
 );
 
 -- Indexes for performance optimization
--- Primary search index on Chinese characters
-CREATE INDEX idx_dictionary_chinese ON dictionary USING gin(chinese gin_trgm_ops);
+-- Primary key index is automatically created for chinese (PRIMARY KEY)
 
 -- Pinyin search index
 CREATE INDEX idx_dictionary_pinyin ON dictionary USING gin(pinyin gin_trgm_ops);
@@ -64,8 +63,8 @@ CREATE INDEX idx_dictionary_type ON dictionary (type);
 -- Full text search index
 CREATE INDEX idx_dictionary_search_vector ON dictionary USING gin(search_vector);
 
--- Composite index for common queries (Chinese + type)
-CREATE INDEX idx_dictionary_chinese_type ON dictionary (chinese, type);
+-- Composite index for type-based queries (optimized since chinese is already primary)
+CREATE INDEX idx_dictionary_type_pinyin ON dictionary (type, pinyin);
 
 -- Function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -100,7 +99,6 @@ ORDER BY count_by_type DESC;
 -- Search function for Vietnamese queries (handles accents)
 CREATE OR REPLACE FUNCTION search_dictionary_vietnamese(search_term TEXT)
 RETURNS TABLE (
-  id UUID,
   chinese VARCHAR(100),
   pinyin VARCHAR(200),
   type word_type,
@@ -115,7 +113,7 @@ RETURNS TABLE (
 BEGIN
   RETURN QUERY
   SELECT 
-    d.id, d.chinese, d.pinyin, d.type, d.meaning_vi, d.meaning_en,
+    d.chinese, d.pinyin, d.type, d.meaning_vi, d.meaning_en,
     d.example_cn, d.example_vi, d.example_en, d.grammar,
     GREATEST(
       similarity(d.meaning_vi, search_term),
@@ -138,7 +136,6 @@ $$ LANGUAGE plpgsql;
 -- Search function for Chinese queries
 CREATE OR REPLACE FUNCTION search_dictionary_chinese(search_term TEXT)
 RETURNS TABLE (
-  id UUID,
   chinese VARCHAR(100),
   pinyin VARCHAR(200),
   type word_type,
@@ -153,7 +150,7 @@ RETURNS TABLE (
 BEGIN
   RETURN QUERY
   SELECT 
-    d.id, d.chinese, d.pinyin, d.type, d.meaning_vi, d.meaning_en,
+    d.chinese, d.pinyin, d.type, d.meaning_vi, d.meaning_en,
     d.example_cn, d.example_vi, d.example_en, d.grammar,
     GREATEST(
       similarity(d.chinese, search_term),
@@ -185,9 +182,10 @@ FROM pg_stats
 WHERE tablename = 'dictionary';
 
 -- Comments for documentation
-COMMENT ON TABLE dictionary IS 'Main dictionary table storing Chinese-Vietnamese word entries with optimized search capabilities';
+COMMENT ON TABLE dictionary IS 'Main dictionary table storing Chinese-Vietnamese word entries with Chinese as primary key for optimal performance';
+COMMENT ON COLUMN dictionary.chinese IS 'Chinese characters - primary key for fast lookups and ensuring uniqueness';
 COMMENT ON COLUMN dictionary.search_vector IS 'Generated tsvector for full-text search across all text fields';
-COMMENT ON INDEX idx_dictionary_chinese IS 'Trigram index for Chinese character search with fuzzy matching';
+COMMENT ON INDEX idx_dictionary_pinyin IS 'Trigram index for pinyin search with fuzzy matching';
 COMMENT ON INDEX idx_dictionary_search_vector IS 'Full-text search index for complex queries';
 
 -- Supabase-specific role and permission setup
@@ -210,3 +208,62 @@ END $$;
 
 -- Supabase RLS setup (can be customized based on requirements)
 -- Note: RLS is disabled during import for performance, can be enabled later
+
+-- Additional optimizations for Chinese primary key
+-- Create a unique constraint to enforce data integrity
+ALTER TABLE dictionary ADD CONSTRAINT dictionary_chinese_unique UNIQUE (chinese);
+
+-- Function to get word by Chinese characters (optimized for primary key)
+CREATE OR REPLACE FUNCTION get_word_by_chinese(word_chinese TEXT)
+RETURNS TABLE (
+  chinese VARCHAR(100),
+  pinyin VARCHAR(200),
+  type word_type,
+  meaning_vi TEXT,
+  meaning_en TEXT,
+  example_cn TEXT,
+  example_vi TEXT,
+  example_en TEXT,
+  grammar TEXT
+) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    d.chinese, d.pinyin, d.type, d.meaning_vi, d.meaning_en,
+    d.example_cn, d.example_vi, d.example_en, d.grammar
+  FROM dictionary d
+  WHERE d.chinese = word_chinese;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function for batch lookup by Chinese characters (optimized)
+CREATE OR REPLACE FUNCTION get_words_by_chinese_list(word_list TEXT[])
+RETURNS TABLE (
+  chinese VARCHAR(100),
+  pinyin VARCHAR(200),
+  type word_type,
+  meaning_vi TEXT,
+  meaning_en TEXT,
+  example_cn TEXT,
+  example_vi TEXT,
+  example_en TEXT,
+  grammar TEXT
+) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    d.chinese, d.pinyin, d.type, d.meaning_vi, d.meaning_en,
+    d.example_cn, d.example_vi, d.example_en, d.grammar
+  FROM dictionary d
+  WHERE d.chinese = ANY(word_list)
+  ORDER BY d.chinese;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to check if Chinese word exists (fast primary key lookup)
+CREATE OR REPLACE FUNCTION word_exists(word_chinese TEXT)
+RETURNS BOOLEAN AS $$
+BEGIN
+  RETURN EXISTS (SELECT 1 FROM dictionary WHERE chinese = word_chinese);
+END;
+$$ LANGUAGE plpgsql;

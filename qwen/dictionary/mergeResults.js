@@ -10,32 +10,54 @@ async function mergeProcessResults() {
         
         const files = await fs.readdir(outputDir);
         
-        // Find all process-specific result files
-        const processFiles = files.filter(file => 
-            file.startsWith('dict-processed-process-') && file.endsWith('.json')
+        // Find all JSON files in output directory (excluding merged files)
+        const jsonFiles = files.filter(file => 
+            file.endsWith('.json') && 
+            !file.startsWith('dict-processed-merged-') &&
+            !file.startsWith('merge-summary-')
         );
         
-        console.log(`Found ${processFiles.length} process result files`);
+        console.log(`Found ${jsonFiles.length} JSON files to merge`);
         
-        if (processFiles.length === 0) {
-            console.log('No process files found to merge');
+        if (jsonFiles.length === 0) {
+            console.log('No JSON files found to merge');
             return;
         }
         
-        let allResults = [];
+        const uniqueResults = new Map(); // Use Map to ensure uniqueness by "chinese" key
         let totalItems = 0;
+        let duplicatesFound = 0;
         
-        // Read and merge all process files
-        for (const file of processFiles.sort()) {
+        // Read and merge all JSON files
+        for (const file of jsonFiles.sort()) {
             const filePath = path.join(outputDir, file);
             try {
                 const content = await fs.readFile(filePath, 'utf8');
                 const data = JSON.parse(content);
                 
                 if (Array.isArray(data)) {
-                    allResults.push(...data);
-                    totalItems += data.length;
-                    console.log(`✓ Merged ${data.length} items from ${file}`);
+                    let fileItemCount = 0;
+                    let fileDuplicateCount = 0;
+                    
+                    for (const item of data) {
+                        if (item && item.chinese) {
+                            const chineseKey = item.chinese;
+                            
+                            if (uniqueResults.has(chineseKey)) {
+                                duplicatesFound++;
+                                fileDuplicateCount++;
+                                console.log(`  Duplicate found: "${chineseKey}" (skipping)`);
+                            } else {
+                                uniqueResults.set(chineseKey, item);
+                                fileItemCount++;
+                            }
+                            totalItems++;
+                        } else {
+                            console.log(`  Warning: Item without 'chinese' key in ${file}`);
+                        }
+                    }
+                    
+                    console.log(`✓ Processed ${file}: ${fileItemCount} unique items, ${fileDuplicateCount} duplicates`);
                 } else {
                     console.log(`⚠ Skipped ${file} - not an array`);
                 }
@@ -44,54 +66,57 @@ async function mergeProcessResults() {
             }
         }
         
-        console.log(`\nTotal items to merge: ${totalItems}`);
+        // Convert Map to Array
+        const allResults = Array.from(uniqueResults.values());
         
-        // Sort by process ID and batch index if metadata exists
+        console.log(`\nTotal items processed: ${totalItems}`);
+        console.log(`Unique items: ${allResults.length}`);
+        console.log(`Duplicates removed: ${duplicatesFound}`);
+        
+        // Sort by Chinese characters for better organization
         allResults.sort((a, b) => {
-            const aProcessId = a._metadata?.processId || 0;
-            const bProcessId = b._metadata?.processId || 0;
-            const aBatchIndex = a._metadata?.batchIndex || 0;
-            const bBatchIndex = b._metadata?.batchIndex || 0;
-            
-            if (aProcessId !== bProcessId) {
-                return aProcessId - bProcessId;
-            }
-            return aBatchIndex - bBatchIndex;
+            return a.chinese.localeCompare(b.chinese, 'zh-CN');
         });
         
         // Save merged results
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const mergedPath = path.join(outputDir, `dict-processed-merged-${timestamp}.json`);
+        const mergedPath = path.join(outputDir, `dictionary-merged-${timestamp}.json`);
         
         await fs.writeFile(mergedPath, JSON.stringify(allResults, null, 2), 'utf8');
         
-        console.log(`\n✓ Successfully merged ${allResults.length} total items to ${mergedPath}`);
+        console.log(`\n✓ Successfully merged ${allResults.length} unique items to ${mergedPath}`);
         
         // Create summary statistics
         const summary = {
-            totalItems: allResults.length,
-            processedFiles: processFiles.length,
+            totalItemsProcessed: totalItems,
+            uniqueItems: allResults.length,
+            duplicatesRemoved: duplicatesFound,
+            sourceFiles: jsonFiles.length,
             mergedAt: new Date().toISOString(),
+            outputFile: mergedPath,
             fileBreakdown: {}
         };
         
-        // Count items per process
-        allResults.forEach(item => {
-            const processId = item._metadata?.processId || 'unknown';
-            if (!summary.fileBreakdown[processId]) {
-                summary.fileBreakdown[processId] = 0;
+        // Count items per file type
+        jsonFiles.forEach(file => {
+            const processMatch = file.match(/dict_batch_\d+_of_\d+_process_(\d+)\.json/);
+            const processId = processMatch ? processMatch[1] : 'unknown';
+            if (!summary.fileBreakdown[`process_${processId}`]) {
+                summary.fileBreakdown[`process_${processId}`] = 0;
             }
-            summary.fileBreakdown[processId]++;
+            summary.fileBreakdown[`process_${processId}`]++;
         });
         
         const summaryPath = path.join(outputDir, `merge-summary-${timestamp}.json`);
         await fs.writeFile(summaryPath, JSON.stringify(summary, null, 2), 'utf8');
         
         console.log(`✓ Summary saved to ${summaryPath}`);
-        console.log('\nBreakdown by process:');
-        Object.entries(summary.fileBreakdown).forEach(([processId, count]) => {
-            console.log(`  Process ${processId}: ${count} items`);
-        });
+        console.log('\nSummary:');
+        console.log(`  Source files: ${jsonFiles.length}`);
+        console.log(`  Total items processed: ${totalItems}`);
+        console.log(`  Unique items: ${allResults.length}`);
+        console.log(`  Duplicates removed: ${duplicatesFound}`);
+        console.log(`  Output file: ${mergedPath}`);
         
     } catch (error) {
         console.error('Error merging results:', error);

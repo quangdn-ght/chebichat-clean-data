@@ -1,5 +1,5 @@
-const fs = require('fs').promises;
-const path = require('path');
+import fs from 'fs/promises';
+import path from 'path';
 
 // Configuration optimized for Supabase
 const config = {
@@ -657,7 +657,7 @@ async function importSingleFile(inputFile) {
 }
 
 // Export for use as module
-module.exports = {
+export {
   importAllDictionaries,
   importSingleFile,
   generateBatchInsert,
@@ -668,6 +668,6 @@ module.exports = {
 };
 
 // Run if called directly
-if (require.main === module) {
+if (import.meta.url === `file://${process.argv[1]}`) {
   main();
 }

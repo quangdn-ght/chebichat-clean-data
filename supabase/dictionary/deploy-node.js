@@ -1,4 +1,4 @@
-import { Client } from 'pg';
+import { createClient } from '@supabase/supabase-js';
 import fs from 'fs/promises';
 import path from 'path';
 import dotenv from 'dotenv';
@@ -14,80 +14,115 @@ const __dirname = dirname(__filename);
 
 /**
  * Supabase Dictionary Deployment Script (Node.js)
- * Deploys dictionary SQL files directly to Supabase with proper role management
+ * Deploys dictionary SQL files to Supabase using the JavaScript client
  */
 
 class SupabaseDeployer {
   constructor(config = {}) {
     this.config = {
+      url: config.url || process.env.SUPABASE_URL,
+      serviceRoleKey: config.serviceRoleKey || process.env.SUPABASE_SERVICE_ROLE_KEY,
+      // Legacy support for old config format
       projectId: config.projectId || process.env.SUPABASE_PROJECT_ID,
       password: config.password || process.env.SUPABASE_DB_PASSWORD,
-      host: config.host || process.env.SUPABASE_HOST || `db.${config.projectId || process.env.SUPABASE_PROJECT_ID}.supabase.co`,
-      port: config.port || process.env.SUPABASE_PORT || 5432,
-      database: config.database || process.env.SUPABASE_DATABASE || 'postgres',
-      user: config.user || process.env.SUPABASE_USER || 'postgres',
-      ssl: config.ssl !== false, // Enable SSL by default for Supabase
       ...config
     };
     
-    this.client = null;
+    // Auto-generate URL from project ID if needed
+    if (!this.config.url && this.config.projectId) {
+      this.config.url = `https://${this.config.projectId}.supabase.co`;
+    }
+    
+    this.supabase = null;
   }
 
   /**
-   * Create database connection
+   * Create Supabase client connection
    */
   async connect() {
     try {
-      console.log('🔌 Connecting to Supabase database...');
-      console.log(`   Host: ${this.config.host}`);
-      console.log(`   Database: ${this.config.database}`);
-      console.log(`   User: ${this.config.user}`);
+      console.log('🔌 Connecting to Supabase...');
+      console.log(`   URL: ${this.config.url}`);
+      console.log(`   Service role key: ${this.config.serviceRoleKey ? '✓ Present' : '✗ Missing'}`);
       
-      this.client = new Client({
-        host: this.config.host,
-        port: this.config.port,
-        database: this.config.database,
-        user: this.config.user,
-        password: this.config.password,
-        ssl: this.config.ssl ? { rejectUnauthorized: false } : false,
-        connectionTimeoutMillis: 30000,
-        query_timeout: 300000, // 5 minutes for large imports
-      });
+      if (!this.config.url) {
+        throw new Error('SUPABASE_URL is required');
+      }
       
-      await this.client.connect();
+      if (!this.config.serviceRoleKey) {
+        throw new Error('SUPABASE_SERVICE_ROLE_KEY is required');
+      }
       
-      // Test connection and get basic info
-      const result = await this.client.query(`
-        SELECT 
-          version() as version,
-          current_database() as database,
-          current_user as user,
-          current_timestamp as connected_at
-      `);
+      this.supabase = createClient(
+        this.config.url,
+        this.config.serviceRoleKey,
+        {
+          auth: {
+            autoRefreshToken: false,
+            persistSession: false,
+            detectSessionInUrl: false
+          }
+        }
+      );
+      
+      // Test connection by querying a simple table or function
+      const { data, error } = await this.supabase
+        .from('dictionary')
+        .select('*', { count: 'exact', head: true });
+      
+      if (error && !error.message.includes('does not exist')) {
+        if (error.message.includes('Invalid API key') || 
+            error.message.includes('authentication')) {
+          throw new Error('Authentication failed - check your SUPABASE_SERVICE_ROLE_KEY');
+        }
+        throw error;
+      }
       
       console.log('✅ Connected successfully to Supabase');
-      console.log(`   PostgreSQL: ${result.rows[0].version.split(' ')[1]}`);
-      console.log(`   Connected at: ${result.rows[0].connected_at}`);
+      console.log('✅ Service role key authenticated');
+      
+      if (error && error.message.includes('does not exist')) {
+        console.log('ℹ️  Dictionary table does not exist yet - will be created');
+      } else {
+        console.log('✅ Dictionary table accessible');
+      }
       
       return true;
     } catch (error) {
       console.error('❌ Failed to connect to Supabase:', error.message);
+      
+      // Provide helpful troubleshooting info
+      if (error.message.includes('Invalid API key') || error.message.includes('authentication')) {
+        console.error('');
+        console.error('� Authentication issue:');
+        console.error('   1. Verify SUPABASE_SERVICE_ROLE_KEY in .env file');
+        console.error('   2. Get the service_role key from: https://app.supabase.com → Project → Settings → API');
+        console.error('   3. Ensure you copied the service_role key, not the anon key');
+      } else if (error.message.includes('SUPABASE_URL')) {
+        console.error('');
+        console.error('� URL issue:');
+        console.error('   1. Verify SUPABASE_URL in .env file');
+        console.error('   2. Format should be: https://your-project-id.supabase.co');
+        console.error('   3. Get it from: https://app.supabase.com → Project → Settings → API');
+      }
+      
       return false;
     }
   }
 
   /**
-   * Disconnect from database
+   * Disconnect from Supabase (cleanup)
    */
   async disconnect() {
-    if (this.client) {
-      await this.client.end();
+    if (this.supabase) {
+      // Supabase client doesn't need explicit disconnection
+      this.supabase = null;
       console.log('🔌 Disconnected from Supabase');
     }
   }
 
   /**
-   * Execute SQL file with proper error handling
+   * Execute SQL file using Supabase client
    */
   async executeSqlFile(filePath) {
     try {
@@ -103,16 +138,269 @@ class SupabaseDeployer {
       
       // Execute with timing
       const startTime = Date.now();
-      await this.client.query(sql);
-      const executionTime = ((Date.now() - startTime) / 1000).toFixed(2);
       
-      console.log(`✅ Executed successfully in ${executionTime}s`);
-      return true;
+      // Extract INSERT statements from SQL file
+      const insertRegex = /INSERT INTO dictionary\s*\([^)]+\)\s*VALUES\s*\([\s\S]*?\);/gi;
+      const insertStatements = sql.match(insertRegex) || [];
+      
+      console.log(`   📊 Found ${insertStatements.length} INSERT statements...`);
+      
+      let totalInserted = 0;
+      let errors = 0;
+      
+      for (let i = 0; i < insertStatements.length; i++) {
+        try {
+          const inserted = await this.executeInsertStatement(insertStatements[i]);
+          totalInserted += inserted;
+          
+          // Progress indicator
+          if ((i + 1) % 5 === 0) {
+            console.log(`   ⏳ Processed ${i + 1}/${insertStatements.length} INSERT statements...`);
+          }
+        } catch (error) {
+          errors++;
+          if (error.message.includes('duplicate key') || 
+              error.message.includes('violates unique constraint')) {
+            // Count as warning for duplicates
+            console.warn(`   ⚠️  Duplicate key in statement ${i + 1}`);
+          } else {
+            console.error(`   ❌ Error in statement ${i + 1}: ${error.message.substring(0, 100)}...`);
+          }
+        }
+      }
+      
+      const executionTime = ((Date.now() - startTime) / 1000).toFixed(2);
+      console.log(`✅ Inserted ${totalInserted} records, ${errors} errors in ${executionTime}s`);
+      
+      return insertStatements.length > 0; // Return true if we found and processed statements
       
     } catch (error) {
       console.error(`❌ Failed to execute ${path.basename(filePath)}:`, error.message);
       return false;
     }
+  }
+
+  /**
+   * Execute an INSERT statement using Supabase client
+   */
+  async executeInsertStatement(statement) {
+    try {
+      // Parse INSERT statement for dictionary table
+      const insertMatch = statement.match(/INSERT INTO dictionary\s*\(([^)]+)\)\s*VALUES\s*([\s\S]*)/i);
+      
+      if (!insertMatch) {
+        throw new Error('Could not parse INSERT statement');
+      }
+      
+      const columns = insertMatch[1].split(',').map(col => col.trim().replace(/"/g, ''));
+      const valuesSection = insertMatch[2].replace(/;$/, '').trim(); // Remove trailing semicolon
+      
+      // Parse multiple VALUES rows
+      const records = [];
+      const valueRows = this.parseValueRows(valuesSection);
+      
+      // Convert each row to object
+      for (const rowValues of valueRows) {
+        const record = {};
+        
+        columns.forEach((col, index) => {
+          if (index < rowValues.length) {
+            record[col] = rowValues[index];
+          }
+        });
+        
+        records.push(record);
+      }
+      
+      if (records.length === 0) {
+        return 0;
+      }
+      
+      // Insert records in smaller batches to avoid timeout
+      const batchSize = 50;
+      let totalInserted = 0;
+      
+      for (let i = 0; i < records.length; i += batchSize) {
+        const batch = records.slice(i, i + batchSize);
+        
+        try {
+          const { data, error } = await this.supabase
+            .from('dictionary')
+            .insert(batch);
+          
+          if (error) {
+            if (error.message.includes('duplicate key') || 
+                error.message.includes('violates unique constraint')) {
+              // Count as successful for duplicates
+              totalInserted += batch.length;
+            } else {
+              throw error;
+            }
+          } else {
+            totalInserted += batch.length;
+          }
+        } catch (batchError) {
+          // Try individual inserts for this batch
+          for (const record of batch) {
+            try {
+              await this.supabase.from('dictionary').insert([record]);
+              totalInserted++;
+            } catch (individualError) {
+              if (individualError.message.includes('duplicate key') || 
+                  individualError.message.includes('violates unique constraint')) {
+                totalInserted++;
+              }
+              // Skip individual errors
+            }
+          }
+        }
+      }
+      
+      return totalInserted;
+      
+    } catch (error) {
+      console.error('Error executing INSERT:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Parse VALUES section to extract individual rows
+   */
+  parseValueRows(valuesSection) {
+    const rows = [];
+    let current = '';
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    
+    for (let i = 0; i < valuesSection.length; i++) {
+      const char = valuesSection[i];
+      
+      if (escaped) {
+        current += char;
+        escaped = false;
+        continue;
+      }
+      
+      if (char === '\\') {
+        escaped = true;
+        current += char;
+        continue;
+      }
+      
+      if (char === "'" && !escaped) {
+        inString = !inString;
+        current += char;
+        continue;
+      }
+      
+      if (!inString) {
+        if (char === '(') {
+          depth++;
+          if (depth === 1) {
+            continue; // Skip opening parenthesis
+          }
+        } else if (char === ')') {
+          depth--;
+          if (depth === 0) {
+            // End of row
+            const values = this.parseValues(current.trim());
+            rows.push(values);
+            current = '';
+            
+            // Skip comma and whitespace
+            while (i + 1 < valuesSection.length && 
+                   (valuesSection[i + 1] === ',' || /\s/.test(valuesSection[i + 1]))) {
+              i++;
+            }
+            continue;
+          }
+        }
+      }
+      
+      current += char;
+    }
+    
+    return rows;
+  }
+
+  /**
+   * Parse VALUES string into array of values
+   */
+  parseValues(valuesString) {
+    const values = [];
+    let current = '';
+    let inString = false;
+    let escaped = false;
+    
+    for (let i = 0; i < valuesString.length; i++) {
+      const char = valuesString[i];
+      
+      if (escaped) {
+        current += char;
+        escaped = false;
+        continue;
+      }
+      
+      if (char === '\\') {
+        escaped = true;
+        current += char;
+        continue;
+      }
+      
+      if (char === "'" && !escaped) {
+        inString = !inString;
+        current += char;
+        continue;
+      }
+      
+      if (!inString && char === ',') {
+        // End of current value
+        let value = current.trim();
+        
+        // Handle different value types
+        if (value.toUpperCase() === 'NULL') {
+          values.push(null);
+        } else if (value.startsWith("'") && value.endsWith("'")) {
+          values.push(value.slice(1, -1).replace(/\\'/g, "'"));
+        } else if (/^-?\d+(\.\d+)?$/.test(value)) {
+          values.push(parseFloat(value));
+        } else if (value.toLowerCase() === 'true') {
+          values.push(true);
+        } else if (value.toLowerCase() === 'false') {
+          values.push(false);
+        } else {
+          values.push(value);
+        }
+        
+        current = '';
+        continue;
+      }
+      
+      current += char;
+    }
+    
+    // Handle last value
+    if (current.trim()) {
+      let value = current.trim();
+      
+      if (value.toUpperCase() === 'NULL') {
+        values.push(null);
+      } else if (value.startsWith("'") && value.endsWith("'")) {
+        values.push(value.slice(1, -1).replace(/\\'/g, "'"));
+      } else if (/^-?\d+(\.\d+)?$/.test(value)) {
+        values.push(parseFloat(value));
+      } else if (value.toLowerCase() === 'true') {
+        values.push(true);
+      } else if (value.toLowerCase() === 'false') {
+        values.push(false);
+      } else {
+        values.push(value);
+      }
+    }
+    
+    return values;
   }
 
   /**
@@ -175,193 +463,112 @@ class SupabaseDeployer {
   }
 
   /**
-   * Setup Supabase roles and permissions before deployment
+   * Setup Supabase roles and permissions (simplified for REST API)
    */
   async setupSupabaseRoles() {
     try {
-      console.log('🔐 Setting up Supabase roles and permissions...');
+      console.log('🔐 Checking Supabase permissions...');
       
-      // Check current user and available roles
-      const userCheck = await this.client.query(`
-        SELECT 
-          current_user as current_user,
-          session_user as session_user,
-          current_role as current_role
-      `);
+      // Test basic operations
+      const { data: testSelect, error: selectError } = await this.supabase
+        .from('dictionary')
+        .select('*')
+        .limit(1);
       
-      console.log(`   Current user: ${userCheck.rows[0].current_user}`);
-      console.log(`   Session user: ${userCheck.rows[0].session_user}`);
-      console.log(`   Current role: ${userCheck.rows[0].current_role}`);
-      
-      // Check available roles
-      const roleCheck = await this.client.query(`
-        SELECT rolname 
-        FROM pg_roles 
-        WHERE rolname IN ('postgres', 'authenticated', 'anon', 'service_role')
-        ORDER BY rolname
-      `);
-      
-      const availableRoles = roleCheck.rows.map(r => r.rolname);
-      console.log(`   Available roles: ${availableRoles.join(', ')}`);
-      
-      // Attempt to set postgres role if available
-      if (availableRoles.includes('postgres')) {
-        try {
-          await this.client.query('SET ROLE postgres');
-          console.log('✅ Successfully set postgres role');
-        } catch (error) {
-          console.log('⚠️  Cannot set postgres role, continuing with current role');
-        }
+      if (selectError && !selectError.message.includes('does not exist')) {
+        console.log(`   ⚠️  SELECT test: ${selectError.message}`);
+      } else {
+        console.log('   ✅ SELECT permission confirmed');
       }
       
-      // Check table permissions
-      if (await this.tableExists('dictionary')) {
-        const permCheck = await this.client.query(`
-          SELECT 
-            has_table_privilege('dictionary', 'SELECT') as can_select,
-            has_table_privilege('dictionary', 'INSERT') as can_insert,
-            has_table_privilege('dictionary', 'UPDATE') as can_update,
-            has_table_privilege('dictionary', 'DELETE') as can_delete
-        `);
+      // Test insert permission (will fail if table doesn't exist, which is fine)
+      try {
+        const { error: insertError } = await this.supabase
+          .from('dictionary')
+          .insert([{ 
+            chinese: '__test__', 
+            type: 'test', 
+            meaning_vi: 'test' 
+          }]);
         
-        const perms = permCheck.rows[0];
-        console.log(`   Dictionary table permissions:`);
-        console.log(`     SELECT: ${perms.can_select ? '✅' : '❌'}`);
-        console.log(`     INSERT: ${perms.can_insert ? '✅' : '❌'}`);
-        console.log(`     UPDATE: ${perms.can_update ? '✅' : '❌'}`);
-        console.log(`     DELETE: ${perms.can_delete ? '✅' : '❌'}`);
-        
-        if (!perms.can_insert) {
-          console.log('⚠️  Warning: No INSERT permission on dictionary table');
+        if (insertError) {
+          if (insertError.message.includes('does not exist')) {
+            console.log('   ℹ️  Table does not exist yet - will be created');
+          } else if (insertError.message.includes('duplicate key')) {
+            console.log('   ✅ INSERT permission confirmed');
+            // Clean up test record
+            await this.supabase
+              .from('dictionary')
+              .delete()
+              .eq('chinese', '__test__');
+          } else {
+            console.log(`   ⚠️  INSERT test: ${insertError.message}`);
+          }
+        } else {
+          console.log('   ✅ INSERT permission confirmed');
+          // Clean up test record
+          await this.supabase
+            .from('dictionary')
+            .delete()
+            .eq('chinese', '__test__');
         }
+      } catch (permError) {
+        console.log(`   ⚠️  Permission test failed: ${permError.message}`);
       }
       
       return true;
     } catch (error) {
-      console.error('❌ Role setup failed:', error.message);
-      console.log('Continuing with current permissions...');
+      console.error('❌ Permission check failed:', error.message);
       return false;
     }
   }
 
   /**
-   * Check if table exists
+   * Check if table exists using Supabase client
    */
   async tableExists(tableName) {
     try {
-      const result = await this.client.query(`
-        SELECT EXISTS (
-          SELECT 1 FROM information_schema.tables 
-          WHERE table_schema = 'public' 
-          AND table_name = $1
-        )
-      `, [tableName]);
+      const { data, error } = await this.supabase
+        .from(tableName)
+        .select('*', { count: 'exact', head: true });
       
-      return result.rows[0].exists;
+      return !error || !error.message.includes('does not exist');
     } catch (error) {
       return false;
     }
   }
 
   /**
-   * Setup Supabase roles and permissions
+   * Setup Supabase roles and permissions (simplified for REST API)
    */
   async setupRoles() {
-    console.log('🔧 Setting up Supabase roles and permissions...');
+    console.log('🔧 Setting up Supabase permissions...');
     
-    // First setup role permissions
+    // Use simplified permission checking for REST API
     await this.setupSupabaseRoles();
     
-    const setupSql = `
-      -- Supabase Role Setup for Dictionary Import
-      
-      -- Enable required extensions
-      CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-      CREATE EXTENSION IF NOT EXISTS "pg_trgm";
-      CREATE EXTENSION IF NOT EXISTS "unaccent";
-      
-      -- Grant permissions to Supabase roles
-      DO $$
-      BEGIN
-        -- Grant to authenticated users
-        IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
-          GRANT USAGE ON SCHEMA public TO authenticated;
-          GRANT CREATE ON SCHEMA public TO authenticated;
-        END IF;
-        
-        -- Grant to service role
-        IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
-          GRANT ALL ON SCHEMA public TO service_role;
-        END IF;
-      EXCEPTION
-        WHEN OTHERS THEN
-          RAISE NOTICE 'Permission grants completed with warnings: %', SQLERRM;
-      END $$;
-      
-      -- Create import optimization functions
-      CREATE OR REPLACE FUNCTION setup_import_session()
-      RETURNS void AS $func$
-      BEGIN
-          SET work_mem = '256MB';
-          SET maintenance_work_mem = '1GB';
-          SET checkpoint_completion_target = 0.9;
-          SET wal_buffers = '16MB';
-          SET log_statement = 'none';
-          SET log_min_duration_statement = -1;
-      END;
-      $func$ LANGUAGE plpgsql;
-      
-      CREATE OR REPLACE FUNCTION cleanup_import_session()
-      RETURNS void AS $func$
-      BEGIN
-          RESET work_mem;
-          RESET maintenance_work_mem;
-          RESET checkpoint_completion_target;
-          RESET wal_buffers;
-          RESET log_statement;
-          RESET log_min_duration_statement;
-      END;
-      $func$ LANGUAGE plpgsql;
-      
-      -- Grant permissions to Supabase default roles
-      DO $$
-      BEGIN
-          IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
-              GRANT USAGE ON SCHEMA public TO authenticated;
-              GRANT SELECT ON ALL TABLES IN SCHEMA public TO authenticated;
-          END IF;
-          
-          IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
-              GRANT USAGE ON SCHEMA public TO anon;
-          END IF;
-      END $$;
-      
-      SELECT 'Supabase roles setup completed' as status;
-    `;
-    
-    try {
-      await this.client.query(setupSql);
-      console.log('✅ Roles and permissions configured');
-      return true;
-    } catch (error) {
-      console.error('❌ Failed to setup roles:', error.message);
-      return false;
-    }
+    console.log('✅ Permission check completed');
+    return true;
   }
 
   /**
-   * Deploy schema
+   * Deploy schema (simplified - assumes schema exists or is managed separately)
    */
   async deploySchema() {
-    console.log('📋 Deploying dictionary schema...');
+    console.log('📋 Checking dictionary schema...');
     
-    const schemaPath = '../db/dictionary_schema.sql';
-    if (!(await this.fileExists(schemaPath))) {
-      console.error('❌ Schema file not found:', schemaPath);
+    // Check if dictionary table exists
+    if (await this.tableExists('dictionary')) {
+      console.log('✅ Dictionary table already exists');
+      return true;
+    } else {
+      console.log('ℹ️  Dictionary table does not exist');
+      console.log('💡 Please create the table first using Supabase Dashboard or SQL:');
+      console.log('   1. Go to https://app.supabase.com → Your Project → SQL Editor');
+      console.log('   2. Run the dictionary schema SQL from ../db/dictionary_schema.sql');
+      console.log('   3. Or use the insert_dict_data.js script which can handle schema creation');
       return false;
     }
-    
-    return await this.executeSqlFile(schemaPath);
   }
 
   /**
@@ -377,73 +584,104 @@ class SupabaseDeployer {
     
     const { files, timestamp } = sqlFiles;
     
-    // Look for master script first
-    const masterFile = files.find(file => file.includes('master'));
+    // Skip master script and deploy individual parts directly
+    const partFiles = files.filter(file => file.includes('part'));
+    partFiles.sort(); // Ensure proper order
     
-    if (masterFile) {
-      console.log('🎯 Using master script for coordinated deployment');
-      return await this.executeSqlFile(masterFile);
-    } else {
-      // Deploy individual parts
-      const partFiles = files.filter(file => file.includes('part'));
-      partFiles.sort(); // Ensure proper order
-      
-      console.log(`📦 Deploying ${partFiles.length} part files`);
-      
-      for (const partFile of partFiles) {
-        const success = await this.executeSqlFile(partFile);
-        if (!success) {
-          console.error('❌ Deployment stopped due to error');
-          return false;
-        }
-      }
-      
-      // Run verification if available
-      const verifyFile = files.find(file => file.includes('verify'));
-      if (verifyFile) {
-        console.log('🔍 Running verification...');
-        await this.executeSqlFile(verifyFile);
-      }
-      
-      return true;
+    if (partFiles.length === 0) {
+      console.error('❌ No part files found for data deployment');
+      return false;
     }
+    
+    console.log(`📦 Deploying ${partFiles.length} part files`);
+    
+    let totalSuccess = true;
+    for (const partFile of partFiles) {
+      const success = await this.executeSqlFile(partFile);
+      if (!success) {
+        console.error('❌ Deployment stopped due to error');
+        totalSuccess = false;
+        break;
+      }
+    }
+    
+    // Run verification if available
+    const verifyFile = files.find(file => file.includes('verify'));
+    if (verifyFile && totalSuccess) {
+      console.log('🔍 Running verification...');
+      await this.executeSqlFile(verifyFile);
+    }
+    
+    return totalSuccess;
   }
 
   /**
-   * Get deployment statistics
+   * Get deployment statistics using Supabase client
    */
   async getStatistics() {
     console.log('📊 Getting deployment statistics...');
     
     try {
-      const result = await this.client.query(`
-        SELECT 
-          'Dictionary Statistics' as info,
-          COUNT(*) as total_records,
-          COUNT(DISTINCT type) as unique_types,
-          COUNT(DISTINCT chinese) as unique_words,
-          pg_size_pretty(pg_total_relation_size('dictionary')) as table_size
-        FROM dictionary;
-      `);
+      // Get total count
+      const { count: totalCount, error: countError } = await this.supabase
+        .from('dictionary')
+        .select('*', { count: 'exact', head: true });
       
-      const typeResult = await this.client.query(`
-        SELECT type, COUNT(*) as count 
-        FROM dictionary 
-        GROUP BY type 
-        ORDER BY count DESC 
-        LIMIT 5;
-      `);
+      if (countError) {
+        throw countError;
+      }
+      
+      // Get sample data to analyze types
+      const { data: sampleData, error: sampleError } = await this.supabase
+        .from('dictionary')
+        .select('type, chinese')
+        .limit(1000); // Sample for type analysis
+      
+      if (sampleError) {
+        throw sampleError;
+      }
+      
+      // Analyze types from sample
+      const typeCount = {};
+      const uniqueWords = new Set();
+      
+      sampleData.forEach(row => {
+        if (row.type) {
+          typeCount[row.type] = (typeCount[row.type] || 0) + 1;
+        }
+        if (row.chinese) {
+          uniqueWords.add(row.chinese);
+        }
+      });
+      
+      // Get latest entries
+      const { data: latestData, error: latestError } = await this.supabase
+        .from('dictionary')
+        .select('chinese, type, created_at')
+        .order('created_at', { ascending: false })
+        .limit(5);
       
       console.log('\n📈 Deployment Statistics:');
-      console.log(`   Total records: ${result.rows[0].total_records}`);
-      console.log(`   Unique types: ${result.rows[0].unique_types}`);
-      console.log(`   Unique words: ${result.rows[0].unique_words}`);
-      console.log(`   Table size: ${result.rows[0].table_size}`);
+      console.log(`   Total records: ${totalCount || 0}`);
+      console.log(`   Unique types: ${Object.keys(typeCount).length}`);
+      console.log(`   Sample unique words: ${uniqueWords.size}`);
       
-      console.log('\n🏆 Top word types:');
-      typeResult.rows.forEach(row => {
-        console.log(`   ${row.type}: ${row.count} words`);
-      });
+      if (Object.keys(typeCount).length > 0) {
+        console.log('\n🏆 Top word types (from sample):');
+        Object.entries(typeCount)
+          .sort(([,a], [,b]) => b - a)
+          .slice(0, 5)
+          .forEach(([type, count]) => {
+            console.log(`   ${type}: ${count} words`);
+          });
+      }
+      
+      if (latestData && latestData.length > 0) {
+        console.log('\n📝 Latest entries:');
+        latestData.forEach((record, index) => {
+          console.log(`   ${index + 1}. ${record.chinese} (${record.type})`);
+        });
+      }
       
       return true;
     } catch (error) {
@@ -503,38 +741,41 @@ async function main() {
   
   // Configuration from environment or command line
   const config = {
+    url: process.env.SUPABASE_URL,
+    serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    // Legacy support
     projectId: process.env.SUPABASE_PROJECT_ID,
     password: process.env.SUPABASE_DB_PASSWORD,
   };
   
   // Validate required configuration
-  if (!config.projectId || !config.password) {
+  if (!config.url && !config.projectId) {
     console.error('❌ Missing required environment variables:');
     console.error('');
-    
-    if (!config.projectId) {
-      console.error('   ❌ SUPABASE_PROJECT_ID is not set');
-    } else {
-      console.error('   ✅ SUPABASE_PROJECT_ID is set');
-    }
-    
-    if (!config.password) {
-      console.error('   ❌ SUPABASE_DB_PASSWORD is not set');
-    } else {
-      console.error('   ✅ SUPABASE_DB_PASSWORD is set');
-    }
-    
+    console.error('   ❌ SUPABASE_URL is not set (or SUPABASE_PROJECT_ID for legacy)');
     console.error('');
     console.error('📋 Setup Instructions:');
     console.error('   1. Copy .env.example to .env');
-    console.error('   2. Fill in your Supabase project details');
-    console.error('   3. Run the script again');
+    console.error('   2. Add your Supabase settings:');
+    console.error('      SUPABASE_URL=https://your-project-id.supabase.co');
+    console.error('      SUPABASE_SERVICE_ROLE_KEY=your-service-role-key');
     console.error('');
-    console.error('💡 Quick setup:');
-    console.error('   cp .env.example .env');
-    console.error('   nano .env  # Edit with your values');
+    console.error('� Get your values from: https://app.supabase.com → Your Project → Settings → API');
+    process.exit(1);
+  }
+  
+  if (!config.serviceRoleKey) {
+    console.error('❌ Missing SUPABASE_SERVICE_ROLE_KEY:');
     console.error('');
-    console.error('🔗 Get your values from: https://app.supabase.com → Your Project → Settings');
+    console.error('🔑 The service role key is required for database operations');
+    console.error('');
+    console.error('📋 How to get it:');
+    console.error('   1. Go to: https://app.supabase.com');
+    console.error('   2. Select your project → Settings → API');
+    console.error('   3. Copy the "service_role" key (not the anon key)');
+    console.error('   4. Add to .env: SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1...');
+    console.error('');
+    console.error('⚠️  Keep the service role key secret - it has admin privileges!');
     process.exit(1);
   }
   
@@ -588,10 +829,10 @@ Commands:
 Configuration:
   Create a .env file with your Supabase settings:
   
-  SUPABASE_PROJECT_ID=your-project-id
-  SUPABASE_DB_PASSWORD=your-database-password
+  SUPABASE_URL=https://your-project-id.supabase.co
+  SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
   
-  Use .env.example as a template.
+  Get these from: https://app.supabase.com → Project → Settings → API
 
 Examples:
   cp .env.example .env    # Copy template
@@ -601,7 +842,7 @@ Examples:
   node deploy-node.js stats
 
 Dependencies:
-  npm install dotenv pg   # Install required packages
+  npm install dotenv @supabase/supabase-js   # Install required packages
 `);
       break;
   }
