@@ -5,3 +5,7 @@ qwen/node_modules/.bin/openai
 qwen/output/*
 qwen/input/*
 qwen/dictionary/output*/*
+supabase/dictionary/import/*
+supabase/dictionary/output/*
+supabase/dictionary/node_modules/*
+/node_modules/*

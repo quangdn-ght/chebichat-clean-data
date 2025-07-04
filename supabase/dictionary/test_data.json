@@ -1,0 +1,35 @@
+[
+  {
+    "chinese": "它们",
+    "pinyin": "tā men",
+    "type": "đại từ",
+    "meaning_vi": "Chúng (dùng để chỉ động vật hoặc đồ vật)",
+    "meaning_en": "They/them (used to refer to animals or objects)",
+    "example_cn": "我喜欢这些小狗，它们很可爱。",
+    "example_vi": "Tôi thích những chú chó con này, chúng rất đáng yêu.",
+    "example_en": "I like these puppies; they are very cute.",
+    "grammar": "Đại từ số nhiều, dùng để chỉ các sự vật hoặc động vật không phải là người."
+  },
+  {
+    "chinese": "爱护",
+    "pinyin": "ài hù",
+    "type": "động từ",
+    "meaning_vi": "Yêu thương và bảo vệ, chăm sóc một cách cẩn thận (con người, động vật, tài sản...)",
+    "meaning_en": "To cherish and protect carefully (people, animals, property, etc.).",
+    "example_cn": "我们要爱护环境。",
+    "example_vi": "Chúng ta cần phải bảo vệ môi trường.",
+    "example_en": "We need to protect the environment.",
+    "grammar": "Là động từ hai âm tiết, thường đi kèm với đối tượng cụ thể phía sau. Ví dụ: 爱护公物 (bảo vệ tài sản công cộng), 爱护孩子 (yêu thương trẻ em)."
+  },
+  {
+    "chinese": "学习",
+    "pinyin": "xué xí",
+    "type": "động từ",
+    "meaning_vi": "Học tập, nghiên cứu để có được kiến thức hoặc kỹ năng",
+    "meaning_en": "To study, learn to acquire knowledge or skills",
+    "example_cn": "我每天都学习中文。",
+    "example_vi": "Tôi học tiếng Trung mỗi ngày.",
+    "example_en": "I study Chinese every day.",
+    "grammar": "Động từ hai âm tiết, có thể đi kèm với đối tượng học tập."
+  }
+]
