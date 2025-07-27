@@ -5,7 +5,7 @@
 case "$1" in
     "start")
         echo "🚀 Starting all dictionary processing workers..."
-        pm2 start ecosystem.config.js
+        pm2 start ecosystem.config.cjs
         echo "✅ All processes started!"
         echo "📊 Use 'pm2 status' to check process status"
         echo "📝 Use 'pm2 logs' to view logs"
@@ -19,7 +19,7 @@ case "$1" in
         echo "🔄 Restarting all dictionary processing workers..."
         pm2 delete all
         sleep 2
-        pm2 start ecosystem.config.js
+        pm2 start ecosystem.config.cjs
         echo "✅ All processes restarted!"
         ;;
     "status")
@@ -41,10 +41,10 @@ case "$1" in
         ;;
     "info")
         echo "📊 Dictionary Processing System Info:"
-        echo "   Total Processes: 10"
-        echo "   Batches per Process: 60 (optimized for 11,494 items)"
-        echo "   Total Capacity: 12,000 items"
-        echo "   Coverage: 100% (all 11,494 items will be processed)"
+        echo "   Total Processes: 30"
+        echo "   Batches per Process: 164 (optimized for 98,053 items)"
+        echo "   Total Capacity: 4,920 batches (98,400 items)"
+        echo "   Coverage: 100% (all 98,053 items will be processed)"
         echo ""
         echo "💡 Commands:"
         echo "   ./pm2.sh start    - Start all processes"

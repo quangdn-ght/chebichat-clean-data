@@ -8,4 +8,4 @@ qwen/dictionary/output*/*
 supabase/dictionary/import/*
 supabase/dictionary/output/*
 supabase/dictionary/node_modules/*
-/node_modules/*
+./node_modules/*

@@ -134,71 +134,250 @@ function extractJsonFromResponse(responseContent) {
     return content;
 }
 
-// Function to process a batch of data
-async function processBatch(batch, batchIndex) {
+// Function to attempt JSON repair for incomplete responses
+function attemptJsonRepair(jsonString) {
     try {
-        console.log(`Process ${config.processId}: Processing batch ${batchIndex + 1} with ${batch.length} items...`);
-        
-        const startTime = Date.now();
-        
-        const completion = await openai.chat.completions.create({
-            model: "qwen-max",
-            messages: [
-                {"role":"system","content":"Bạn là một chuyên gia dịch thuật từ điển tiếng Trung – tiếng Việt, có kinh nghiệm dạy học sinh Việt Nam. Mục tiêu là giúp học sinh hiểu và ghi nhớ từ vựng tiếng Trung dễ dàng, thông qua:\\n\\nDịch nghĩa ví dụ sang tiếng Việt (chính) và tiếng anh (phụ).\\n\\nGiải nghĩa từ đơn giản, dễ hiểu.\\n\\nCung cấp ví dụ cụ thể bằng tiếng Trung và dịch nghĩa.\\n\\nGiải thích ngữ pháp nếu từ đó có đặc điểm ngữ pháp đặc biệt (từ loại, cách dùng, vị trí trong câu...). Xuất kết quả theo dạng JSON, \\n\\nVí dụ Output mẫu:\\n  {\\n    \"chinese\": \"爱护\",\\n    \"pinyin\": \"ài hù\",\\n    \"type\": \"động từ\",\\n    \"meaning_vi\": \"Yêu thương và bảo vệ, chăm sóc một cách cẩn thận (con người, động vật, tài sản...)\",\\n    \"meaning_en\": \"To cherish and protect carefully (people, animals, property, etc.).\",\\n    \"example_cn\": \"我们要爱护环境。\",\\n    \"example_vi\": \"Chúng ta cần phải bảo vệ môi trường.\",\\n    \"example_en\": \"We need to protect the environment.\",\\n    \"grammar\": \"Là động từ hai âm tiết, thường đi kèm với đối tượng cụ thể phía sau. Ví dụ: 爱护公物 (bảo vệ tài sản công cộng), 爱护孩子 (yêu thương trẻ em).\"\\n  }"},
-                {
-                    "role": "user",
-                    "content": JSON.stringify(batch)
-                }
-            ],
-            top_p: 0.8,
-            temperature: 0.7
-        });
-
-        const endTime = Date.now();
-        const responseTimeMs = endTime - startTime;
-        const responseTimeSeconds = (responseTimeMs / 1000).toFixed(2);
-        
-        console.log(`Process ${config.processId}: ✓ Batch ${batchIndex + 1} completed in ${responseTimeSeconds}s`);
-
-        const responseContent = completion.choices[0].message.content;
-        
-        let parsedResponse;
-        try {
-            const jsonResponse = extractJsonFromResponse(responseContent);
-            parsedResponse = JSON.parse(jsonResponse);
-            console.log(`Process ${config.processId}: ✓ Successfully parsed JSON response for batch ${batchIndex + 1}`);
-        } catch (parseError) {
-            console.error(`Process ${config.processId}: ✗ Failed to parse JSON response for batch ${batchIndex + 1}:`, parseError);
-            parsedResponse = {
-                error: "Failed to parse JSON",
-                parseError: parseError.message,
-                rawResponse: responseContent,
-                extractedJson: extractJsonFromResponse(responseContent),
-                batch: batch,
-                responseTime: responseTimeSeconds,
-                processId: config.processId
-            };
-        }
-
-        if (parsedResponse && typeof parsedResponse === 'object' && !parsedResponse.error) {
-            parsedResponse._metadata = {
-                responseTime: responseTimeSeconds,
-                batchIndex: batchIndex + 1,
-                processId: config.processId,
-                timestamp: new Date().toISOString()
-            };
-        }
-
-        return parsedResponse;
+        // Try to parse as-is first
+        return JSON.parse(jsonString);
     } catch (error) {
-        console.error(`Process ${config.processId}: ✗ Error processing batch ${batchIndex + 1}:`, error);
-        return {
-            error: error.message,
-            batch: batch,
-            processId: config.processId,
-            timestamp: new Date().toISOString()
-        };
+        // Common repair strategies
+        let repairedJson = jsonString.trim();
+        
+        // Strategy 1: If it's an incomplete array, close it
+        if (repairedJson.startsWith('[') && !repairedJson.endsWith(']')) {
+            // Count open objects
+            let openBraces = 0;
+            let lastCompleteObject = -1;
+            
+            for (let i = 0; i < repairedJson.length; i++) {
+                if (repairedJson[i] === '{') {
+                    openBraces++;
+                } else if (repairedJson[i] === '}') {
+                    openBraces--;
+                    if (openBraces === 0) {
+                        lastCompleteObject = i;
+                    }
+                }
+            }
+            
+            if (lastCompleteObject > -1) {
+                // Truncate to last complete object and close array
+                repairedJson = repairedJson.substring(0, lastCompleteObject + 1) + ']';
+                try {
+                    return JSON.parse(repairedJson);
+                } catch (e) {
+                    // Continue to next strategy
+                }
+            }
+        }
+        
+        // Strategy 2: If it's an incomplete object, close it
+        if (repairedJson.startsWith('{') && !repairedJson.endsWith('}')) {
+            // Find last complete property
+            let lastComma = repairedJson.lastIndexOf(',');
+            let lastColon = repairedJson.lastIndexOf(':');
+            
+            if (lastComma > lastColon) {
+                // Remove incomplete property and close object
+                repairedJson = repairedJson.substring(0, lastComma) + '}';
+            } else if (lastColon > -1) {
+                // Remove incomplete value and close object
+                let beforeColon = repairedJson.substring(0, lastColon - 1);
+                let lastQuote = beforeColon.lastIndexOf('"');
+                if (lastQuote > -1) {
+                    repairedJson = beforeColon.substring(0, lastQuote) + '}';
+                }
+            }
+            
+            try {
+                return JSON.parse(repairedJson);
+            } catch (e) {
+                // Continue to next strategy
+            }
+        }
+        
+        // Strategy 3: Return empty array as fallback
+        console.warn(`Could not repair JSON, returning empty array`);
+        return [];
     }
+}
+
+// Function to process a batch with retry logic
+async function processBatchWithRetry(batch, batchIndex, maxRetries = 3) {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            console.log(`Process ${config.processId}: Processing batch ${batchIndex + 1} with ${batch.length} items (attempt ${attempt}/${maxRetries})...`);
+            
+            // Extract only the "word" values for API processing
+            const wordsToProcess = batch.map(item => item.word);
+            
+            const startTime = Date.now();
+            
+            const completion = await openai.chat.completions.create({
+                model: "qwen-max",
+                messages: [
+                    {"role":"system","content":"Bạn là một chuyên gia dịch thuật từ điển tiếng Trung – tiếng Việt, có kinh nghiệm dạy học sinh Việt Nam. Mục tiêu là giúp học sinh hiểu và ghi nhớ từ vựng tiếng Trung dễ dàng, thông qua:\\n\\nDịch nghĩa ví dụ sang tiếng Việt (chính) và tiếng anh (phụ).\\n\\nGiải nghĩa từ đơn giản, dễ hiểu.\\n\\nCung cấp ví dụ cụ thể bằng tiếng Trung và dịch nghĩa.\\n\\nGiải thích ngữ pháp nếu từ đó có đặc điểm ngữ pháp đặc biệt (từ loại, cách dùng, vị trí trong câu...). Xuất kết quả theo dạng JSON array, mỗi phần tử là một object cho một từ. QUAN TRỌNG: Luôn trả về JSON array hoàn chỉnh và hợp lệ.\\n\\nVí dụ Output mẫu:\\n[\\n  {\\n    \"chinese\": \"爱护\",\\n    \"pinyin\": \"ài hù\",\\n    \"type\": \"động từ\",\\n    \"meaning_vi\": \"Yêu thương và bảo vệ, chăm sóc một cách cẩn thận (con người, động vật, tài sản...)\",\\n    \"meaning_en\": \"To cherish and protect carefully (people, animals, property, etc.).\",\\n    \"example_cn\": \"我们要爱护环境。\",\\n    \"example_vi\": \"Chúng ta cần phải bảo vệ môi trường.\",\\n    \"example_en\": \"We need to protect the environment.\",\\n    \"grammar\": \"Là động từ hai âm tiết, thường đi kèm với đối tượng cụ thể phía sau. Ví dụ: 爱护公物 (bảo vệ tài sản công cộng), 爱护孩子 (yêu thương trẻ em).\",\\n    \"hsk_level\": 6\\n  }\\n]"},
+                    {
+                        "role": "user",
+                        "content": JSON.stringify(wordsToProcess)
+                    }
+                ],
+                top_p: 0.8,
+                temperature: 0.7,
+                max_tokens: 4000, // Increase token limit to prevent truncation
+                timeout: 60000 // 60 second timeout
+            });
+
+            const endTime = Date.now();
+            const responseTimeMs = endTime - startTime;
+            const responseTimeSeconds = (responseTimeMs / 1000).toFixed(2);
+            
+            const responseContent = completion.choices[0].message.content;
+            
+            // Check if response was truncated by looking at finish_reason
+            if (completion.choices[0].finish_reason === 'length') {
+                console.warn(`Process ${config.processId}: Response was truncated for batch ${batchIndex + 1}, attempting to repair...`);
+            }
+            
+            let parsedResponse;
+            try {
+                const jsonResponse = extractJsonFromResponse(responseContent);
+                parsedResponse = attemptJsonRepair(jsonResponse);
+                
+                // Validate that we got reasonable results
+                if (!Array.isArray(parsedResponse)) {
+                    throw new Error("Response is not an array");
+                }
+                
+                if (parsedResponse.length === 0 && wordsToProcess.length > 0) {
+                    throw new Error("Got empty array for non-empty input");
+                }
+                
+                console.log(`Process ${config.processId}: ✓ Successfully parsed JSON response for batch ${batchIndex + 1} (${parsedResponse.length} items)`);
+                
+                // Merge original meaning as meaning_cn
+                parsedResponse = parsedResponse.map((item, index) => {
+                    if (batch[index] && batch[index].meaning) {
+                        return {
+                            ...item,
+                            meaning_cn: batch[index].meaning
+                        };
+                    }
+                    return item;
+                });
+                
+                // Add metadata
+                parsedResponse._metadata = {
+                    responseTime: responseTimeSeconds,
+                    batchIndex: batchIndex + 1,
+                    processId: config.processId,
+                    timestamp: new Date().toISOString(),
+                    attempt: attempt,
+                    finishReason: completion.choices[0].finish_reason
+                };
+                
+                return parsedResponse;
+                
+            } catch (parseError) {
+                console.error(`Process ${config.processId}: ✗ Failed to parse JSON response for batch ${batchIndex + 1} (attempt ${attempt}):`, parseError.message);
+                
+                // If this is the last attempt, try processing individual items
+                if (attempt === maxRetries) {
+                    console.log(`Process ${config.processId}: Attempting individual word processing for batch ${batchIndex + 1}...`);
+                    return await processIndividualWords(batch, batchIndex);
+                }
+                
+                // Otherwise, wait before retry
+                const retryDelay = attempt * 2000; // Exponential backoff
+                console.log(`Process ${config.processId}: Retrying batch ${batchIndex + 1} in ${retryDelay}ms...`);
+                await new Promise(resolve => setTimeout(resolve, retryDelay));
+                continue;
+            }
+            
+        } catch (error) {
+            console.error(`Process ${config.processId}: ✗ Error processing batch ${batchIndex + 1} (attempt ${attempt}):`, error.message);
+            
+            if (attempt === maxRetries) {
+                // Last attempt failed, return error object
+                return {
+                    error: error.message,
+                    batch: batch,
+                    processId: config.processId,
+                    timestamp: new Date().toISOString(),
+                    attempts: maxRetries
+                };
+            }
+            
+            // Wait before retry
+            const retryDelay = attempt * 2000;
+            console.log(`Process ${config.processId}: Retrying batch ${batchIndex + 1} in ${retryDelay}ms...`);
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
+        }
+    }
+}
+
+// Fallback function to process words individually
+async function processIndividualWords(batch, batchIndex) {
+    console.log(`Process ${config.processId}: Processing ${batch.length} words individually for batch ${batchIndex + 1}...`);
+    const results = [];
+    
+    for (let i = 0; i < batch.length; i++) {
+        try {
+            const word = batch[i];
+            const completion = await openai.chat.completions.create({
+                model: "qwen-max",
+                messages: [
+                    {"role":"system","content":"Bạn là một chuyên gia dịch thuật từ điển tiếng Trung – tiếng Việt. Trả về JSON object cho từ vựng tiếng Trung được yêu cầu. Format: {\"chinese\": \"từ\", \"pinyin\": \"phiên âm\", \"type\": \"từ loại\", \"meaning_vi\": \"nghĩa tiếng Việt\", \"meaning_en\": \"nghĩa tiếng Anh\", \"example_cn\": \"ví dụ tiếng Trung\", \"example_vi\": \"ví dụ tiếng Việt\", \"example_en\": \"ví dụ tiếng Anh\", \"grammar\": \"giải thích ngữ pháp\", \"hsk_level\": số_cấp_độ}"},
+                    {
+                        "role": "user",
+                        "content": word.word
+                    }
+                ],
+                top_p: 0.8,
+                temperature: 0.7,
+                max_tokens: 1000
+            });
+            
+            const responseContent = completion.choices[0].message.content;
+            const jsonResponse = extractJsonFromResponse(responseContent);
+            const parsedResponse = attemptJsonRepair(jsonResponse);
+            
+            if (parsedResponse && typeof parsedResponse === 'object') {
+                results.push({
+                    ...parsedResponse,
+                    meaning_cn: word.meaning
+                });
+            } else {
+                // Fallback: create basic entry
+                results.push({
+                    chinese: word.word,
+                    meaning_cn: word.meaning,
+                    error: "Individual processing failed",
+                    timestamp: new Date().toISOString()
+                });
+            }
+            
+            // Small delay between individual requests
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+        } catch (error) {
+            console.error(`Process ${config.processId}: Error processing individual word ${batch[i].word}:`, error.message);
+            results.push({
+                chinese: batch[i].word,
+                meaning_cn: batch[i].meaning,
+                error: "Individual processing failed",
+                errorMessage: error.message,
+                timestamp: new Date().toISOString()
+            });
+        }
+    }
+    
+    return results;
+}
+
+// Function to process a batch of data (wrapper for retry logic)
+async function processBatch(batch, batchIndex) {
+    return await processBatchWithRetry(batch, batchIndex);
 }
 
 // Function to save results to output file
@@ -266,7 +445,7 @@ async function main() {
         
         // Read input data
         console.log(`Process ${config.processId}: Reading input data...`);
-        const inputPath = './input/dict-full.json';
+        const inputPath = './input/DICTIONARY.json';
         const inputData = JSON.parse(await fs.readFile(inputPath, 'utf8'));
         
         console.log(`Process ${config.processId}: Loaded ${inputData.length} items from ${inputPath}`);
