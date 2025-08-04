@@ -15,20 +15,20 @@ function parseArguments() {
         batchDelay: parseInt(process.env.BATCH_DELAY) || 2000,
         processId: 1,
         totalProcesses: 1,
-        batchesPerProcess: 60
+        maxBatches: 50 // Maximum batches to process per run
     };
 
     console.log(`API key:`, config.apiKey);
 
-    // Parse arguments: --process-id=1 --total-processes=10 --batches-per-process=50
+    // Parse arguments: --process-id=1 --total-processes=10 --max-batches=50
     for (let i = 0; i < args.length; i++) {
         const arg = args[i];
         if (arg.startsWith('--process-id=')) {
             config.processId = parseInt(arg.split('=')[1]);
         } else if (arg.startsWith('--total-processes=')) {
             config.totalProcesses = parseInt(arg.split('=')[1]);
-        } else if (arg.startsWith('--batches-per-process=')) {
-            config.batchesPerProcess = parseInt(arg.split('=')[1]);
+        } else if (arg.startsWith('--max-batches=')) {
+            config.maxBatches = parseInt(arg.split('=')[1]);
         }
     }
 
@@ -45,50 +45,57 @@ if (!config.apiKey) {
     process.exit(1);
 }
 
-if (config.processId < 1 || config.processId > config.totalProcesses) {
-    console.error(`Error: process-id (${config.processId}) must be between 1 and ${config.totalProcesses}`);
-    process.exit(1);
-}
-
-console.log(`Process ${config.processId}/${config.totalProcesses} - Configuration:`);
+console.log(`Error Reprocessing - Process ${config.processId}/${config.totalProcesses} - Configuration:`);
 console.log(`  Batch size: ${config.batchSize}`);
 console.log(`  Delay: ${config.batchDelay}ms`);
-console.log(`  Batches per process: ${config.batchesPerProcess}`);
+console.log(`  Max batches per run: ${config.maxBatches}`);
 
 const openai = new OpenAI({
     apiKey: config.apiKey,
     baseURL: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
 });
 
-// Function to chunk array into smaller batches
-function chunkArray(array, chunkSize) {
-    const chunks = [];
-    for (let i = 0; i < array.length; i += chunkSize) {
-        chunks.push(array.slice(i, i + chunkSize));
+// Function to check if a file contains the access denied error
+async function hasAccessDeniedError(filePath) {
+    try {
+        const content = await fs.readFile(filePath, 'utf8');
+        return content.includes('400 Access denied, please make sure your account is in good standing');
+    } catch (error) {
+        console.error(`Error reading file ${filePath}:`, error.message);
+        return false;
     }
-    return chunks;
 }
 
-// Function to calculate batch range for this process - FIXED to prevent overlaps
-function calculateBatchRange(totalBatches, processId, totalProcesses, batchesPerProcess) {
-    // Use a simple, non-overlapping distribution
-    const batchesPerProcessOptimal = Math.ceil(totalBatches / totalProcesses);
-    
-    // Always use the optimal distribution to ensure no gaps or overlaps
-    const startBatch = (processId - 1) * batchesPerProcessOptimal;
-    const endBatch = Math.min(startBatch + batchesPerProcessOptimal - 1, totalBatches - 1);
-    
-    console.log(`Process ${processId}: Fixed calculation:`);
-    console.log(`  Total batches: ${totalBatches}`);
-    console.log(`  Batches per process (optimal): ${batchesPerProcessOptimal}`);
-    console.log(`  Assigned range: ${startBatch + 1} to ${endBatch + 1}`);
-    
-    return { 
-        startBatch, 
-        endBatch, 
-        batchesPerProcess: batchesPerProcessOptimal,
-        actualBatches: endBatch >= startBatch ? endBatch - startBatch + 1 : 0
-    };
+// Function to extract batch information from filename
+function extractBatchInfo(filename) {
+    // Handle both regular and backup files
+    const cleanFilename = filename.replace('.error-backup', '').replace('.backup', '');
+    const match = cleanFilename.match(/dict_batch_(\d+)_of_(\d+)_process_(\d+)\.json/);
+    if (match) {
+        return {
+            batchNumber: parseInt(match[1]),
+            totalBatches: parseInt(match[2]),
+            processId: parseInt(match[3])
+        };
+    }
+    console.warn(`⚠ Filename pattern not recognized: ${filename} (cleaned: ${cleanFilename})`);
+    return null;
+}
+
+// Function to get original batch data from input file
+async function getOriginalBatchData(batchNumber, batchSize) {
+    try {
+        const inputPath = './input/DICTIONARY.json';
+        const inputData = JSON.parse(await fs.readFile(inputPath, 'utf8'));
+        
+        const startIndex = (batchNumber - 1) * batchSize;
+        const endIndex = Math.min(startIndex + batchSize, inputData.length);
+        
+        return inputData.slice(startIndex, endIndex);
+    } catch (error) {
+        console.error(`Error reading original batch data for batch ${batchNumber}:`, error.message);
+        return null;
+    }
 }
 
 // Function to extract JSON from markdown code blocks
@@ -204,10 +211,10 @@ function attemptJsonRepair(jsonString) {
 }
 
 // Function to process a batch with retry logic
-async function processBatchWithRetry(batch, batchIndex, maxRetries = 3) {
+async function processBatchWithRetry(batch, batchInfo, maxRetries = 3) {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
-            console.log(`Process ${config.processId}: Processing batch ${batchIndex + 1} with ${batch.length} items (attempt ${attempt}/${maxRetries})...`);
+            console.log(`Reprocessing batch ${batchInfo.batchNumber} with ${batch.length} items (attempt ${attempt}/${maxRetries})...`);
             
             // Extract only the "word" values for API processing
             const wordsToProcess = batch.map(item => item.word);
@@ -225,8 +232,8 @@ async function processBatchWithRetry(batch, batchIndex, maxRetries = 3) {
                 ],
                 top_p: 0.8,
                 temperature: 0.7,
-                max_tokens: 4000, // Increase token limit to prevent truncation
-                timeout: 60000 // 60 second timeout
+                max_tokens: 4000,
+                timeout: 60000
             });
 
             const endTime = Date.now();
@@ -235,9 +242,9 @@ async function processBatchWithRetry(batch, batchIndex, maxRetries = 3) {
             
             const responseContent = completion.choices[0].message.content;
             
-            // Check if response was truncated by looking at finish_reason
+            // Check if response was truncated
             if (completion.choices[0].finish_reason === 'length') {
-                console.warn(`Process ${config.processId}: Response was truncated for batch ${batchIndex + 1}, attempting to repair...`);
+                console.warn(`Response was truncated for batch ${batchInfo.batchNumber}, attempting to repair...`);
             }
             
             let parsedResponse;
@@ -254,7 +261,7 @@ async function processBatchWithRetry(batch, batchIndex, maxRetries = 3) {
                     throw new Error("Got empty array for non-empty input");
                 }
                 
-                console.log(`Process ${config.processId}: ✓ Successfully parsed JSON response for batch ${batchIndex + 1} (${parsedResponse.length} items)`);
+                console.log(`✓ Successfully reprocessed batch ${batchInfo.batchNumber} (${parsedResponse.length} items)`);
                 
                 // Merge original meaning as meaning_cn
                 parsedResponse = parsedResponse.map((item, index) => {
@@ -270,56 +277,55 @@ async function processBatchWithRetry(batch, batchIndex, maxRetries = 3) {
                 // Add metadata
                 parsedResponse._metadata = {
                     responseTime: responseTimeSeconds,
-                    batchIndex: batchIndex + 1,
+                    batchIndex: batchInfo.batchNumber,
                     processId: config.processId,
                     timestamp: new Date().toISOString(),
                     attempt: attempt,
-                    finishReason: completion.choices[0].finish_reason
+                    finishReason: completion.choices[0].finish_reason,
+                    reprocessed: true
                 };
                 
                 return parsedResponse;
                 
             } catch (parseError) {
-                console.error(`Process ${config.processId}: ✗ Failed to parse JSON response for batch ${batchIndex + 1} (attempt ${attempt}):`, parseError.message);
+                console.error(`✗ Failed to parse JSON response for batch ${batchInfo.batchNumber} (attempt ${attempt}):`, parseError.message);
                 
-                // If this is the last attempt, try processing individual items
                 if (attempt === maxRetries) {
-                    console.log(`Process ${config.processId}: Attempting individual word processing for batch ${batchIndex + 1}...`);
-                    return await processIndividualWords(batch, batchIndex);
+                    console.log(`Attempting individual word processing for batch ${batchInfo.batchNumber}...`);
+                    return await processIndividualWords(batch, batchInfo);
                 }
                 
-                // Otherwise, wait before retry
-                const retryDelay = attempt * 2000; // Exponential backoff
-                console.log(`Process ${config.processId}: Retrying batch ${batchIndex + 1} in ${retryDelay}ms...`);
+                // Wait before retry
+                const retryDelay = attempt * 2000;
+                console.log(`Retrying batch ${batchInfo.batchNumber} in ${retryDelay}ms...`);
                 await new Promise(resolve => setTimeout(resolve, retryDelay));
                 continue;
             }
             
         } catch (error) {
-            console.error(`Process ${config.processId}: ✗ Error processing batch ${batchIndex + 1} (attempt ${attempt}):`, error.message);
+            console.error(`✗ Error processing batch ${batchInfo.batchNumber} (attempt ${attempt}):`, error.message);
             
             if (attempt === maxRetries) {
-                // Last attempt failed, return error object
                 return {
                     error: error.message,
                     batch: batch,
-                    processId: config.processId,
+                    batchInfo: batchInfo,
                     timestamp: new Date().toISOString(),
-                    attempts: maxRetries
+                    attempts: maxRetries,
+                    reprocessed: true
                 };
             }
             
-            // Wait before retry
             const retryDelay = attempt * 2000;
-            console.log(`Process ${config.processId}: Retrying batch ${batchIndex + 1} in ${retryDelay}ms...`);
+            console.log(`Retrying batch ${batchInfo.batchNumber} in ${retryDelay}ms...`);
             await new Promise(resolve => setTimeout(resolve, retryDelay));
         }
     }
 }
 
 // Fallback function to process words individually
-async function processIndividualWords(batch, batchIndex) {
-    console.log(`Process ${config.processId}: Processing ${batch.length} words individually for batch ${batchIndex + 1}...`);
+async function processIndividualWords(batch, batchInfo) {
+    console.log(`Processing ${batch.length} words individually for batch ${batchInfo.batchNumber}...`);
     const results = [];
     
     for (let i = 0; i < batch.length; i++) {
@@ -349,7 +355,6 @@ async function processIndividualWords(batch, batchIndex) {
                     meaning_cn: word.meaning
                 });
             } else {
-                // Fallback: create basic entry
                 results.push({
                     chinese: word.word,
                     meaning_cn: word.meaning,
@@ -358,11 +363,10 @@ async function processIndividualWords(batch, batchIndex) {
                 });
             }
             
-            // Small delay between individual requests
             await new Promise(resolve => setTimeout(resolve, 500));
             
         } catch (error) {
-            console.error(`Process ${config.processId}: Error processing individual word ${batch[i].word}:`, error.message);
+            console.error(`Error processing individual word ${batch[i].word}:`, error.message);
             results.push({
                 chinese: batch[i].word,
                 meaning_cn: batch[i].meaning,
@@ -376,174 +380,147 @@ async function processIndividualWords(batch, batchIndex) {
     return results;
 }
 
-// Function to process a batch of data (wrapper for retry logic)
-async function processBatch(batch, batchIndex) {
-    return await processBatchWithRetry(batch, batchIndex);
-}
-
 // Function to save results to output file
 async function saveResults(results, filename) {
     const outputPath = path.join('./output', filename);
     try {
         await fs.writeFile(outputPath, JSON.stringify(results, null, 2), 'utf8');
-        console.log(`Process ${config.processId}: Results saved to ${outputPath}`);
+        console.log(`✓ Results saved to ${outputPath}`);
     } catch (error) {
-        console.error(`Process ${config.processId}: Error saving results to ${outputPath}:`, error);
+        console.error(`✗ Error saving results to ${outputPath}:`, error);
     }
 }
 
-// Function to check if batch result already exists and is not an error
-async function batchExists(batchIndex, totalBatches, processId) {
-    const filename = `dict_batch_${batchIndex + 1}_of_${totalBatches}_process_${processId}.json`;
-    const outputPath = path.join('./output', filename);
+// Function to backup the original error file
+async function backupErrorFile(filename) {
+    const originalPath = path.join('./output', filename);
+    const backupPath = path.join('./output', filename.replace('.json', '.error-backup.json'));
+    
     try {
-        await fs.access(outputPath);
-        
-        // Check if the file contains an access denied error
-        const content = await fs.readFile(outputPath, 'utf8');
-        if (content.includes('400 Access denied, please make sure your account is in good standing')) {
-            console.log(`Batch ${batchIndex + 1} exists but contains access denied error - will reprocess`);
-            return false;
-        }
-        
-        return true;
-    } catch {
-        return false;
-    }
-}
-
-// Function to append to process-specific output file
-async function appendToProcessFile(newData, processId) {
-    const filename = `dict-processed-process-${processId}.json`;
-    const outputPath = path.join('./output', filename);
-    try {
-        let existingData = [];
-        
-        try {
-            const existingContent = await fs.readFile(outputPath, 'utf8');
-            if (existingContent.trim()) {
-                existingData = JSON.parse(existingContent);
-                if (!Array.isArray(existingData)) {
-                    existingData = [];
-                }
-            }
-        } catch (readError) {
-            console.log(`Process ${processId}: Creating new file: ${outputPath}`);
-        }
-        
-        if (Array.isArray(newData)) {
-            existingData.push(...newData);
-        } else {
-            existingData.push(newData);
-        }
-        
-        await fs.writeFile(outputPath, JSON.stringify(existingData, null, 2), 'utf8');
-        console.log(`Process ${processId}: Appended ${Array.isArray(newData) ? newData.length : 1} items to ${outputPath}. Total: ${existingData.length} items.`);
-        
-        return existingData.length;
+        await fs.copyFile(originalPath, backupPath);
+        console.log(`✓ Backed up original error file to ${backupPath}`);
     } catch (error) {
-        console.error(`Process ${processId}: Error appending to ${outputPath}:`, error);
-        throw error;
+        console.warn(`⚠ Could not backup error file ${filename}:`, error.message);
     }
 }
 
 async function main() {
     try {
-        // Ensure output directory exists
-        await fs.mkdir('./output', { recursive: true });
+        console.log('🔍 Scanning for files with "400 Access denied" errors...');
         
-        // Read input data
-        console.log(`Process ${config.processId}: Reading input data...`);
-        const inputPath = './input/DICTIONARY.json';
-        const inputData = JSON.parse(await fs.readFile(inputPath, 'utf8'));
-        
-        console.log(`Process ${config.processId}: Loaded ${inputData.length} items from ${inputPath}`);
-        
-        // Split data into batches
-        const batches = chunkArray(inputData, config.batchSize);
-        console.log(`Process ${config.processId}: Split ${inputData.length} items into ${batches.length} total batches`);
-        
-        // Calculate total capacity and coverage
-        const totalCapacity = config.totalProcesses * config.batchesPerProcess * config.batchSize;
-        const coverage = ((totalCapacity / inputData.length) * 100).toFixed(1);
-        console.log(`Process ${config.processId}: System capacity: ${totalCapacity} items (${coverage}% of ${inputData.length} total items)`);
-        
-        if (totalCapacity < inputData.length) {
-            console.log(`Process ${config.processId}: ⚠️  WARNING: Current configuration may not process all items!`);
-            console.log(`Process ${config.processId}: Consider increasing batch size or batches per process.`);
-        }
-        
-        // Calculate which batches this process should handle
-        const { startBatch, endBatch, actualBatches } = calculateBatchRange(
-            batches.length, 
-            config.processId, 
-            config.totalProcesses, 
-            config.batchesPerProcess
+        // Get list of all output files (exclude backup files)
+        const outputFiles = await fs.readdir('./output');
+        const jsonFiles = outputFiles.filter(file => 
+            file.endsWith('.json') && 
+            file.startsWith('dict_batch_') && 
+            !file.includes('.error-backup.') &&
+            !file.includes('.backup.')
         );
         
-        console.log(`Process ${config.processId}: Handling batches ${startBatch + 1} to ${endBatch + 1} (${actualBatches} batches)`);
+        console.log(`📁 Found ${jsonFiles.length} batch files to check`);
         
-        if (startBatch >= batches.length || actualBatches === 0) {
-            console.log(`Process ${config.processId}: No batches to process`);
+        // Find files with access denied errors
+        const errorFiles = [];
+        for (const file of jsonFiles) {
+            if (await hasAccessDeniedError(path.join('./output', file))) {
+                errorFiles.push(file);
+            }
+        }
+        
+        console.log(`❌ Found ${errorFiles.length} files with access denied errors`);
+        
+        if (errorFiles.length === 0) {
+            console.log('✅ No files with access denied errors found!');
             return;
         }
         
-        const allResults = [];
-        let processedCount = 0;
+        // Sort error files by batch number for logical processing
+        errorFiles.sort((a, b) => {
+            const aInfo = extractBatchInfo(a);
+            const bInfo = extractBatchInfo(b);
+            return aInfo?.batchNumber - bInfo?.batchNumber;
+        });
         
-        // Process assigned batches
-        for (let i = startBatch; i <= endBatch && i < batches.length; i++) {
-            // Check if batch already processed
-            const exists = await batchExists(i, batches.length, config.processId);
-            if (exists) {
-                console.log(`Process ${config.processId}: Batch ${i + 1} already exists, skipping...`);
-                processedCount += batches[i].length;
+        // Calculate which files this process should handle
+        const filesPerProcess = Math.ceil(errorFiles.length / config.totalProcesses);
+        const startIndex = (config.processId - 1) * filesPerProcess;
+        const endIndex = Math.min(startIndex + filesPerProcess, errorFiles.length);
+        const assignedFiles = errorFiles.slice(startIndex, endIndex);
+        
+        // Limit the number of batches to process in this run
+        const filesToProcess = assignedFiles.slice(0, config.maxBatches);
+        
+        console.log(`🔧 Process ${config.processId}/${config.totalProcesses} assigned ${assignedFiles.length} files`);
+        console.log(`⚡ Processing ${filesToProcess.length} files in this run (max: ${config.maxBatches})`);
+        
+        if (filesToProcess.length === 0) {
+            console.log('✅ No files assigned to this process');
+            return;
+        }
+        
+        let processedCount = 0;
+        let successCount = 0;
+        let errorCount = 0;
+        
+        for (const filename of filesToProcess) {
+            const batchInfo = extractBatchInfo(filename);
+            if (!batchInfo) {
+                console.warn(`⚠ Could not extract batch info from ${filename} - skipping`);
+                errorCount++;
+                processedCount++;
                 continue;
             }
             
-            const batchProgress = processedCount + (i - startBatch) * config.batchSize;
-            const totalAssigned = (endBatch - startBatch + 1) * config.batchSize;
-            console.log(`Process ${config.processId}: Progress: ${batchProgress}/${totalAssigned} items processed (${Math.round(batchProgress/totalAssigned*100)}%)`);
+            console.log(`\n🔄 [${processedCount + 1}/${filesToProcess.length}] Processing batch ${batchInfo.batchNumber}...`);
             
-            const batchResult = await processBatch(batches[i], i);
-            allResults.push({
-                batchIndex: i,
-                batchSize: batches[i].length,
-                result: batchResult,
-                processId: config.processId,
-                timestamp: new Date().toISOString()
-            });
-            
-            // Save intermediate results after each batch
-            const intermediateFilename = `dict_batch_${i + 1}_of_${batches.length}_process_${config.processId}.json`;
-            await saveResults(batchResult, intermediateFilename);
-            
-            // Append results to process-specific output file
-            if (Array.isArray(batchResult)) {
-                await appendToProcessFile(batchResult, config.processId);
-            } else if (batchResult && !batchResult.error) {
-                await appendToProcessFile(batchResult, config.processId);
-            } else {
-                console.log(`Process ${config.processId}: Skipping append for batch ${i + 1} due to error or invalid result`);
+            // Get original batch data
+            const originalBatch = await getOriginalBatchData(batchInfo.batchNumber, config.batchSize);
+            if (!originalBatch) {
+                console.error(`❌ Could not get original data for batch ${batchInfo.batchNumber}`);
+                errorCount++;
+                processedCount++;
+                continue;
             }
             
-            processedCount += batches[i].length;
+            // Backup the error file
+            await backupErrorFile(filename);
             
-            // Add delay between requests
-            if (i < endBatch && i < batches.length - 1) {
-                console.log(`Process ${config.processId}: Waiting ${config.batchDelay}ms before next batch...`);
+            // Process the batch
+            const result = await processBatchWithRetry(originalBatch, batchInfo);
+            
+            // Save the new result
+            await saveResults(result, filename);
+            
+            if (result.error) {
+                errorCount++;
+                console.error(`❌ Failed to reprocess batch ${batchInfo.batchNumber}`);
+            } else {
+                successCount++;
+                console.log(`✅ Successfully reprocessed batch ${batchInfo.batchNumber}`);
+            }
+            
+            processedCount++;
+            
+            // Add delay between batches
+            if (processedCount < filesToProcess.length) {
+                console.log(`⏳ Waiting ${config.batchDelay}ms before next batch...`);
                 await new Promise(resolve => setTimeout(resolve, config.batchDelay));
             }
         }
         
-        // Save complete results for this process
-        const completeFilename = `dict_complete_process_${config.processId}_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
-        await saveResults(allResults, completeFilename);
+        console.log(`\n📊 Reprocessing Summary:`);
+        console.log(`   Total files processed: ${processedCount}`);
+        console.log(`   Successful: ${successCount}`);
+        console.log(`   Failed: ${errorCount}`);
+        console.log(`   Remaining error files: ${assignedFiles.length - filesToProcess.length}`);
+        console.log(`\n✅ Reprocessing completed!`);
         
-        console.log(`Process ${config.processId}: Processing completed successfully! Processed ${processedCount} items.`);
+        if (assignedFiles.length > filesToProcess.length) {
+            console.log(`\n💡 To process remaining files, run the script again or increase --max-batches parameter.`);
+        }
         
     } catch (error) {
-        console.error(`Process ${config.processId}: Error in main function:`, error);
+        console.error('❌ Error in main function:', error);
         process.exit(1);
     }
 }

@@ -6,7 +6,17 @@
   "type": "module",
   "scripts": {
     "start": "node index.js",
-    "test": "node test.js"
+    "test": "node test.js",
+    "fix:missing": "cd dictionary && ./fix_missing_items.sh",
+    "fix:missing:parallel": "cd dictionary && ./fix_missing_items.sh --parallel",
+    "fix:missing:combine": "cd dictionary && ./fix_missing_items.sh --combine",
+    "dictionary:identify": "cd dictionary && node identify_missing_items.js",
+    "dictionary:split": "cd dictionary && node split_missing_items.js",
+    "dictionary:parallel": "cd dictionary && pm2 start ecosystem.missing.config.cjs",
+    "dictionary:status": "pm2 status",
+    "dictionary:logs": "pm2 logs",
+    "dictionary:stop": "pm2 stop ecosystem.missing.config.cjs",
+    "dictionary:delete": "pm2 delete ecosystem.missing.config.cjs"
   },
   "keywords": [
     "chinese",
