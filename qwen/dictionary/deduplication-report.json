@@ -1,0 +1,160 @@
+{
+  "timestamp": "2025-08-04T23:42:29.730Z",
+  "totalItemsBefore": 83152,
+  "duplicatesRemoved": 1008,
+  "totalItemsAfter": 83152,
+  "duplicatesByProcess": {
+    "1": {
+      "originalCount": 3179,
+      "uniqueCount": 3179,
+      "duplicatesRemoved": 0
+    },
+    "2": {
+      "originalCount": 2976,
+      "uniqueCount": 2913,
+      "duplicatesRemoved": 63
+    },
+    "3": {
+      "originalCount": 2606,
+      "uniqueCount": 2585,
+      "duplicatesRemoved": 21
+    },
+    "4": {
+      "originalCount": 2971,
+      "uniqueCount": 2888,
+      "duplicatesRemoved": 83
+    },
+    "5": {
+      "originalCount": 2984,
+      "uniqueCount": 2984,
+      "duplicatesRemoved": 0
+    },
+    "6": {
+      "originalCount": 2818,
+      "uniqueCount": 2793,
+      "duplicatesRemoved": 25
+    },
+    "7": {
+      "originalCount": 2998,
+      "uniqueCount": 2925,
+      "duplicatesRemoved": 73
+    },
+    "8": {
+      "originalCount": 2970,
+      "uniqueCount": 2970,
+      "duplicatesRemoved": 0
+    },
+    "9": {
+      "originalCount": 2875,
+      "uniqueCount": 2815,
+      "duplicatesRemoved": 60
+    },
+    "10": {
+      "originalCount": 2988,
+      "uniqueCount": 2917,
+      "duplicatesRemoved": 71
+    },
+    "11": {
+      "originalCount": 2853,
+      "uniqueCount": 2853,
+      "duplicatesRemoved": 0
+    },
+    "12": {
+      "originalCount": 2838,
+      "uniqueCount": 2771,
+      "duplicatesRemoved": 67
+    },
+    "13": {
+      "originalCount": 2843,
+      "uniqueCount": 2809,
+      "duplicatesRemoved": 34
+    },
+    "14": {
+      "originalCount": 2761,
+      "uniqueCount": 2759,
+      "duplicatesRemoved": 2
+    },
+    "15": {
+      "originalCount": 2663,
+      "uniqueCount": 2612,
+      "duplicatesRemoved": 51
+    },
+    "16": {
+      "originalCount": 2726,
+      "uniqueCount": 2677,
+      "duplicatesRemoved": 49
+    },
+    "17": {
+      "originalCount": 2605,
+      "uniqueCount": 2605,
+      "duplicatesRemoved": 0
+    },
+    "18": {
+      "originalCount": 2783,
+      "uniqueCount": 2696,
+      "duplicatesRemoved": 87
+    },
+    "19": {
+      "originalCount": 2509,
+      "uniqueCount": 2506,
+      "duplicatesRemoved": 3
+    },
+    "20": {
+      "originalCount": 2566,
+      "uniqueCount": 2566,
+      "duplicatesRemoved": 0
+    },
+    "21": {
+      "originalCount": 2712,
+      "uniqueCount": 2604,
+      "duplicatesRemoved": 108
+    },
+    "22": {
+      "originalCount": 2811,
+      "uniqueCount": 2806,
+      "duplicatesRemoved": 5
+    },
+    "23": {
+      "originalCount": 2826,
+      "uniqueCount": 2826,
+      "duplicatesRemoved": 0
+    },
+    "24": {
+      "originalCount": 2738,
+      "uniqueCount": 2671,
+      "duplicatesRemoved": 67
+    },
+    "25": {
+      "originalCount": 2699,
+      "uniqueCount": 2679,
+      "duplicatesRemoved": 20
+    },
+    "26": {
+      "originalCount": 2678,
+      "uniqueCount": 2678,
+      "duplicatesRemoved": 0
+    },
+    "27": {
+      "originalCount": 2726,
+      "uniqueCount": 2617,
+      "duplicatesRemoved": 109
+    },
+    "28": {
+      "originalCount": 2746,
+      "uniqueCount": 2744,
+      "duplicatesRemoved": 2
+    },
+    "29": {
+      "originalCount": 2569,
+      "uniqueCount": 2568,
+      "duplicatesRemoved": 1
+    },
+    "30": {
+      "originalCount": 2135,
+      "uniqueCount": 2128,
+      "duplicatesRemoved": 7
+    }
+  },
+  "finalCoverage": "84.8",
+  "expectedTotal": 98053
+}

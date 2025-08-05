@@ -57,6 +57,8 @@ console.log('\n=== COMPARING ACTUAL VS EXPECTED CONTENT ===');
 let totalExpectedItems = 0;
 let totalActualItems = 0;
 const missingItemsByProcess = {};
+const allActualWords = new Map(); // Track all words and which processes have them
+const duplicateWords = new Map(); // Track duplicated words
 
 for (let processId = 1; processId <= totalProcesses; processId++) {
     if (!correctAssignments[processId]) continue;
@@ -71,13 +73,29 @@ for (let processId = 1; processId <= totalProcesses; processId++) {
     try {
         actualItems = JSON.parse(readFileSync(processFile, 'utf8'));
         totalActualItems += actualItems.length;
+        
+        // Track all words and detect duplicates across processes
+        for (const item of actualItems) {
+            const word = item.chinese || item.word;
+            if (word) {
+                if (allActualWords.has(word)) {
+                    // This word exists in another process - it's a duplicate
+                    const existingProcesses = allActualWords.get(word);
+                    existingProcesses.push(processId);
+                    duplicateWords.set(word, existingProcesses);
+                } else {
+                    allActualWords.set(word, [processId]);
+                }
+            }
+        }
+        
     } catch (e) {
         console.log(`Process ${processId}: No aggregated file found`);
     }
     
     const difference = expectedItems.length - actualItems.length;
     if (difference !== 0) {
-        console.log(`Process ${processId}: expected ${expectedItems.length}, actual ${actualItems.length}, missing ${difference}`);
+        console.log(`Process ${processId}: expected ${expectedItems.length}, actual ${actualItems.length}, difference ${difference}`);
         
         if (difference > 0) {
             // Find which specific items are missing by comparing word values
@@ -101,6 +119,47 @@ console.log(`\nTotal expected items: ${totalExpectedItems}`);
 console.log(`Total actual items: ${totalActualItems}`);
 console.log(`Total missing items: ${totalExpectedItems - totalActualItems}`);
 
+// Analyze duplicates
+console.log('\n=== DUPLICATE ANALYSIS ===');
+console.log(`Total unique words in all processes: ${allActualWords.size}`);
+console.log(`Total duplicated words: ${duplicateWords.size}`);
+
+if (duplicateWords.size > 0) {
+    let totalDuplicateInstances = 0;
+    for (const [word, processes] of duplicateWords) {
+        totalDuplicateInstances += processes.length - 1; // -1 because original is not a duplicate
+    }
+    
+    console.log(`Total duplicate instances: ${totalDuplicateInstances}`);
+    console.log(`Expected total without duplicates: ${totalActualItems - totalDuplicateInstances}`);
+    
+    console.log('\nFirst 10 duplicated words:');
+    let count = 0;
+    for (const [word, processes] of duplicateWords) {
+        if (count >= 10) break;
+        console.log(`  "${word}": found in processes ${processes.join(', ')}`);
+        count++;
+    }
+    
+    // Save duplicate analysis
+    const duplicateAnalysis = {
+        totalUniqueWords: allActualWords.size,
+        totalDuplicatedWords: duplicateWords.size,
+        totalDuplicateInstances: totalDuplicateInstances,
+        duplicateWords: Object.fromEntries(duplicateWords)
+    };
+    
+    const missingDir = './missing-items';
+    try {
+        await fs.access(missingDir);
+    } catch {
+        await fs.mkdir(missingDir, { recursive: true });
+    }
+    
+    await fs.writeFile(`${missingDir}/duplicate-analysis.json`, JSON.stringify(duplicateAnalysis, null, 2), 'utf8');
+    console.log(`\nDuplicate analysis saved to ${missingDir}/duplicate-analysis.json`);
+}
+
 // Save missing items for each process that can be reprocessed
 console.log('\n=== SAVING MISSING ITEMS FOR REPROCESSING ===');
 
@@ -111,11 +170,14 @@ try {
     await fs.mkdir(missingDir, { recursive: true });
 }
 
+// Only save missing items if there are actually missing items (not just duplicates)
+let actualMissingCount = 0;
 for (const [processId, missingItems] of Object.entries(missingItemsByProcess)) {
     if (missingItems.length > 0) {
         const filename = `${missingDir}/missing-items-process-${processId}.json`;
         await fs.writeFile(filename, JSON.stringify(missingItems, null, 2), 'utf8');
         console.log(`Saved ${missingItems.length} missing items for process ${processId} to ${filename}`);
+        actualMissingCount += missingItems.length;
     }
 }
 
@@ -134,4 +196,16 @@ if (allMissingItems.length > 0) {
     console.log('1. Review the missing items files');
     console.log('2. Run a targeted processing job for these missing items');
     console.log('3. Merge the results back into the main aggregated files');
+} else {
+    console.log('\n=== NO MISSING ITEMS FOUND ===');
+    if (duplicateWords.size > 0) {
+        console.log('The discrepancy is due to duplicate items across processes.');
+        console.log('Consider running a deduplication process instead of reprocessing.');
+        console.log('');
+        console.log('Next steps:');
+        console.log('1. Create deduplicated files by removing duplicates');
+        console.log('2. Verify final count matches expected total');
+    } else {
+        console.log('All items are properly processed. No action needed.');
+    }
 }

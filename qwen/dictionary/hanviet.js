@@ -1,21 +1,14 @@
 import fs from 'fs/promises';
 import path from 'path';
 
-// Get input file from command line arguments
-const args = process.argv.slice(2);
-if (args.length === 0) {
-    console.error('Usage: node hanviet.js <input-json-file>');
-    console.error('Example: node hanviet.js input.json');
-    process.exit(1);
-}
-
-const inputFile = args[0];
+// Fixed input file path for the complete dictionary
+const inputFile = './output-final/complete-dictionary-perfect.json';
 const hanvietDictPath = './input/tudienhanviet.json';
-const outputFile = inputFile.replace('.json', '_with_hanviet.json');
+const outputFile = './output-final/complete-dictionary-perfect-with-hanviet.json';
 
 async function mergeHanVietData() {
     try {
-        console.log('🚀 Starting Han-Viet merger...');
+        console.log('🚀 Starting Han-Viet merger for single-character Chinese words...');
         
         // Load input JSON file
         console.log(`📂 Loading input file: ${inputFile}`);
@@ -27,14 +20,19 @@ async function mergeHanVietData() {
         const hanvietDict = JSON.parse(await fs.readFile(hanvietDictPath, 'utf8'));
         console.log(`✅ Loaded ${Object.keys(hanvietDict).length} entries from Han-Viet dictionary`);
         
-        // Merge data
-        console.log('🔄 Merging data...');
+        // Merge data (only for single-character Chinese words)
+        console.log('🔄 Merging data (filtering for single-character Chinese words)...');
         let matchedCount = 0;
         let unmatchedCount = 0;
         
         const mergedData = inputData.map((entry, index) => {
             const chinese = entry.chinese;
-            const hanviet = hanvietDict[chinese] || null;
+            
+            // Only match single-character Chinese words
+            let hanviet = null;
+            if (chinese && chinese.length === 1) {
+                hanviet = hanvietDict[chinese] || null;
+            }
             
             if (hanviet) {
                 matchedCount++;
@@ -71,6 +69,7 @@ async function mergeHanVietData() {
         console.log('✅ Merge completed successfully!');
         console.log('📊 Summary:');
         console.log(`   Total entries: ${inputData.length}`);
+        console.log(`   Single-character entries checked: ${inputData.filter(e => e.chinese && e.chinese.length === 1).length}`);
         console.log(`   Matched Han-Viet: ${matchedCount} (${(matchedCount/inputData.length*100).toFixed(1)}%)`);
         console.log(`   Unmatched: ${unmatchedCount} (${(unmatchedCount/inputData.length*100).toFixed(1)}%)`);
         console.log(`   Output file: ${outputFile}`);
@@ -79,8 +78,9 @@ async function mergeHanVietData() {
         console.error('❌ Error during merge:', error.message);
         
         if (error.code === 'ENOENT') {
-            if (error.path === inputFile) {
+            if (error.path.includes('complete-dictionary-perfect.json')) {
                 console.error(`   Input file not found: ${inputFile}`);
+                console.error('   Make sure the complete-dictionary-perfect.json file exists in output-final/');
             } else if (error.path === hanvietDictPath) {
                 console.error(`   Han-Viet dictionary not found: ${hanvietDictPath}`);
             }

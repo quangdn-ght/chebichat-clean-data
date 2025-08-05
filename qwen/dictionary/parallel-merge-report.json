@@ -1,0 +1,192 @@
+{
+  "timestamp": "2025-08-04T23:45:27.232Z",
+  "processingType": "parallel",
+  "itemsMerged": 0,
+  "totalItemsAfter": 98865,
+  "inputTotal": 98053,
+  "coverage": "100.8",
+  "unmappedItems": 5,
+  "mergeResults": {
+    "1": {
+      "originalCount": 3343,
+      "newItemsAdded": 0,
+      "duplicatesSkipped": 165,
+      "finalCount": 3343
+    },
+    "2": {
+      "originalCount": 3395,
+      "newItemsAdded": 0,
+      "duplicatesSkipped": 420,
+      "finalCount": 3395
+    },
+    "3": {
+      "originalCount": 3338,
+      "newItemsAdded": 0,
+      "duplicatesSkipped": 732,
+      "finalCount": 3338
+    },
+    "4": {
+      "originalCount": 3402,
+      "newItemsAdded": 0,
+      "duplicatesSkipped": 432,
+      "finalCount": 3402
+    },
+    "5": {
+      "originalCount": 3394,
+      "newItemsAdded": 0,
+      "duplicatesSkipped": 410,
+      "finalCount": 3394
+    },
+    "6": {
+      "originalCount": 3387,
+      "newItemsAdded": 0,
+      "duplicatesSkipped": 569,
+      "finalCount": 3387
+    },
+    "7": {
+      "originalCount": 3372,
+      "newItemsAdded": 0,
+      "duplicatesSkipped": 374,
+      "finalCount": 3372
+    },
+    "8": {
+      "originalCount": 3396,
+      "newItemsAdded": 0,
+      "duplicatesSkipped": 426,
+      "finalCount": 3396
+    },
+    "9": {
+      "originalCount": 3378,
+      "newItemsAdded": 0,
+      "duplicatesSkipped": 503,
+      "finalCount": 3378
+    },
+    "10": {
+      "originalCount": 3369,
+      "newItemsAdded": 0,
+      "duplicatesSkipped": 381,
+      "finalCount": 3369
+    },
+    "11": {
+      "originalCount": 3281,
+      "newItemsAdded": 0,
+      "duplicatesSkipped": 428,
+      "finalCount": 3281
+    },
+    "12": {
+      "originalCount": 3261,
+      "newItemsAdded": 0,
+      "duplicatesSkipped": 423,
+      "finalCount": 3261
+    },
+    "13": {
+      "originalCount": 3280,
+      "newItemsAdded": 0,
+      "duplicatesSkipped": 438,
+      "finalCount": 3280
+    },
+    "14": {
+      "originalCount": 3280,
+      "newItemsAdded": 0,
+      "duplicatesSkipped": 519,
+      "finalCount": 3280
+    },
+    "15": {
+      "originalCount": 3274,
+      "newItemsAdded": 0,
+      "duplicatesSkipped": 611,
+      "finalCount": 3274
+    },
+    "16": {
+      "originalCount": 3262,
+      "newItemsAdded": 0,
+      "duplicatesSkipped": 536,
+      "finalCount": 3262
+    },
+    "17": {
+      "originalCount": 3280,
+      "newItemsAdded": 0,
+      "duplicatesSkipped": 675,
+      "finalCount": 3280
+    },
+    "18": {
+      "originalCount": 3260,
+      "newItemsAdded": 0,
+      "duplicatesSkipped": 477,
+      "finalCount": 3260
+    },
+    "19": {
+      "originalCount": 3248,
+      "newItemsAdded": 0,
+      "duplicatesSkipped": 739,
+      "finalCount": 3248
+    },
+    "20": {
+      "originalCount": 3235,
+      "newItemsAdded": 0,
+      "duplicatesSkipped": 670,
+      "finalCount": 3235
+    },
+    "21": {
+      "originalCount": 3260,
+      "newItemsAdded": 0,
+      "duplicatesSkipped": 548,
+      "finalCount": 3260
+    },
+    "22": {
+      "originalCount": 3279,
+      "newItemsAdded": 0,
+      "duplicatesSkipped": 468,
+      "finalCount": 3279
+    },
+    "23": {
+      "originalCount": 3284,
+      "newItemsAdded": 0,
+      "duplicatesSkipped": 458,
+      "finalCount": 3284
+    },
+    "24": {
+      "originalCount": 3273,
+      "newItemsAdded": 0,
+      "duplicatesSkipped": 535,
+      "finalCount": 3273
+    },
+    "25": {
+      "originalCount": 3279,
+      "newItemsAdded": 0,
+      "duplicatesSkipped": 580,
+      "finalCount": 3279
+    },
+    "26": {
+      "originalCount": 3281,
+      "newItemsAdded": 0,
+      "duplicatesSkipped": 603,
+      "finalCount": 3281
+    },
+    "27": {
+      "originalCount": 3279,
+      "newItemsAdded": 0,
+      "duplicatesSkipped": 553,
+      "finalCount": 3279
+    },
+    "28": {
+      "originalCount": 3276,
+      "newItemsAdded": 0,
+      "duplicatesSkipped": 530,
+      "finalCount": 3276
+    },
+    "29": {
+      "originalCount": 3276,
+      "newItemsAdded": 0,
+      "duplicatesSkipped": 707,
+      "finalCount": 3276
+    },
+    "30": {
+      "originalCount": 2943,
+      "newItemsAdded": 0,
+      "duplicatesSkipped": 808,
+      "finalCount": 2943
+    }
+  },
+  "successfulItemsFile": "./missing-items-processed-parallel/successful_items_for_merge.json"
+}
