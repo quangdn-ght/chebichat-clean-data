@@ -1,0 +1,15 @@
+{
+  "name": "chengyu-classifier",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Chinese idiom classifier using Qwen API",
+  "main": "classify-idioms.js",
+  "scripts": {
+    "classify": "node classify-idioms.js",
+    "start": "node classify-idioms.js"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.1",
+    "openai": "^4.104.0"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "event_message": "{\"component\":\"api\",\"error\":\"failed to close prepared statement: ERROR: current transaction is aborted, commands ignored until end of transaction block (SQLSTATE 25P02): ERROR: column \\\"plan_type\\\" does not exist (SQLSTATE 42703)\",\"level\":\"error\",\"method\":\"POST\",\"msg\":\"500: Database error creating new user\",\"path\":\"/admin/users\",\"referer\":\"https://chebichat.com.vn/auth/verification-success\",\"remote_addr\":\"47.128.81.3\",\"request_id\":\"990d9cbd74caa036-SIN\",\"time\":\"2025-10-19T04:43:02Z\"}",
+  "id": "b44011b8-4a72-43d3-9d66-177481bda928",
+
+base on SUPABASE_SERVICE_ROLE_KEY and refer current schema sql file. fix error supabase can't create user
+
+chebichat.ai@gmail.com

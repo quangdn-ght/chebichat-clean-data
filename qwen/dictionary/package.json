@@ -1,0 +1,6 @@
+{
+  "name": "dictionary-generator",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Optimized dictionary generator for Chinese-Vietnamese translations"
+}

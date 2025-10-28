@@ -1,0 +1,125 @@
+{
+  "total": 737,
+  "classified": 737,
+  "failed": [
+    {
+      "idiom": "胡说八道",
+      "category": "胡说八道"
+    },
+    {
+      "idiom": "剑拔弩张",
+      "category": "剑拔弩张"
+    },
+    {
+      "idiom": "一鸣惊人",
+      "category": "一鸣惊人"
+    },
+    {
+      "idiom": "天下太平",
+      "category": "天下太平"
+    },
+    {
+      "idiom": "归心似箭",
+      "error": "400 Input data may contain inappropriate content."
+    },
+    {
+      "idiom": "大步流星",
+      "error": "400 Input data may contain inappropriate content."
+    },
+    {
+      "idiom": "可圈可点",
+      "error": "400 Input data may contain inappropriate content."
+    },
+    {
+      "idiom": "如虎添翼",
+      "error": "400 Input data may contain inappropriate content."
+    },
+    {
+      "idiom": "红颜薄命",
+      "error": "400 Input data may contain inappropriate content."
+    },
+    {
+      "idiom": "若隐若现",
+      "error": "400 Input data may contain inappropriate content."
+    },
+    {
+      "idiom": "异曲同工",
+      "error": "400 Input data may contain inappropriate content."
+    },
+    {
+      "idiom": "立竿见影",
+      "error": "400 Input data may contain inappropriate content."
+    },
+    {
+      "idiom": "螳臂当车",
+      "error": "400 Input data may contain inappropriate content."
+    },
+    {
+      "idiom": "大惊失色",
+      "error": "400 Input data may contain inappropriate content."
+    },
+    {
+      "idiom": "天水一色"
+    },
+    {
+      "idiom": "生死存亡",
+      "category": "生死存亡"
+    },
+    {
+      "idiom": "深不可测",
+      "category": "深不可测"
+    },
+    {
+      "idiom": "骑虎难下",
+      "category": "骑虎难下"
+    },
+    {
+      "idiom": "狼狈为奸",
+      "category": "狼狈为奸"
+    },
+    {
+      "idiom": "走马观花",
+      "category": "走马观花"
+    },
+    {
+      "idiom": "新仇旧恨",
+      "category": "新仇旧恨"
+    },
+    {
+      "idiom": "走马观花",
+      "category": "走马观花"
+    },
+    {
+      "idiom": "趁火打劫",
+      "category": "趁火打劫"
+    },
+    {
+      "idiom": "安然无恙",
+      "category": "安然无恙"
+    },
+    {
+      "idiom": "自投罗网",
+      "category": "自投罗网"
+    },
+    {
+      "idiom": "独树一帜",
+      "category": "独树一帜"
+    },
+    {
+      "idiom": "天公作美",
+      "category": "天公作美"
+    }
+  ],
+  "distribution": {
+    "比喻形象": 149,
+    "人情世故": 117,
+    "智慧谋略": 69,
+    "学习勤奋": 24,
+    "自然时光": 73,
+    "战争政治": 53,
+    "情绪状态": 96,
+    "人生哲学": 51,
+    "数字成语": 53,
+    "品德修养": 52
+  }
+}

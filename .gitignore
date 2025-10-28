@@ -17,3 +17,6 @@ qwen/dictionary/missing-items-processed-parallel/*
 qwen/dictionary/backup-20250805_064847/*
 node_modules/*
 qwen/dictionary/backup-enhanced*/
+qwen/chengyu-category/node_modules/.package-lock.json
+qwen/chengyu-category/node_modules/.bin/openai
+qwen/chengyu-category/node_modules/*

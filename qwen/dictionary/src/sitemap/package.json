@@ -1,0 +1,14 @@
+{
+  "name": "chebichat-sitemap-generator",
+  "version": "1.0.0",
+  "description": "Generate SEO sitemaps for CheBiChat dictionary",
+  "main": "sitemap.js",
+  "scripts": {
+    "generate": "node sitemap.js",
+    "preview": "node sitemap.js --preview",
+    "test": "node sitemap.js --test"
+  },
+  "keywords": ["sitemap", "seo", "dictionary", "chebichat"],
+  "author": "CheBiChat",
+  "license": "MIT"
+}
