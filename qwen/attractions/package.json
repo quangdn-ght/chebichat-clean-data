@@ -1,0 +1,44 @@
+{
+  "name": "attraction-content-generator",
+  "version": "1.0.0",
+  "description": "Generate multilingual travel attraction content using Qwen-Max API",
+  "type": "module",
+  "main": "attraction-generator.js",
+  "scripts": {
+    "start": "node supabase-attraction-processor.js",
+    "test-db": "node test-supabase.js",
+    "test-single": "node supabase-attraction-processor.js --code 10001",
+    "test-api": "node test-generator.js",
+    "process-dry": "node supabase-attraction-processor.js --limit 10",
+    "process-update": "node supabase-attraction-processor.js --limit 10 --update-db",
+    "process-all": "node supabase-attraction-processor.js --update-db",
+    "standalone": "node attraction-generator.js",
+    "pm2:start": "./start-pm2.sh",
+    "pm2:start-dry": "./start-pm2.sh --dry-run",
+    "pm2:start-2": "./start-pm2.sh --workers 2",
+    "pm2:start-8": "./start-pm2.sh --workers 8",
+    "pm2:monitor": "./monitor-pm2.sh",
+    "pm2:monitor-db": "node monitor-db.js",
+    "pm2:merge": "./merge-results.sh",
+    "pm2:stop": "pm2 stop attraction-worker",
+    "pm2:delete": "pm2 delete attraction-worker",
+    "pm2:logs": "pm2 logs attraction-worker"
+  },
+  "keywords": [
+    "travel",
+    "tourism",
+    "qwen",
+    "ai",
+    "translation",
+    "vietnamese",
+    "chinese"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "openai": "^4.20.0",
+    "dotenv": "^16.0.3",
+    "@supabase/supabase-js": "^2.39.0",
+    "pm2": "^5.3.0"
+  }
+}

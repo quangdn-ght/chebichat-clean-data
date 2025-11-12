@@ -1,0 +1,69 @@
+╔══════════════════════════════════════════════════════════════════════╗
+║           PM2 MULTI-WORKER - QUICK REFERENCE CARD                    ║
+╚══════════════════════════════════════════════════════════════════════╝
+
+📦 SETUP
+─────────────────────────────────────────────────────────────────────
+  npm install                    # Install dependencies (includes PM2)
+
+🚀 START PROCESSING
+─────────────────────────────────────────────────────────────────────
+  npm run pm2:start             # 4 workers (recommended) ⭐
+  npm run pm2:start-2           # 2 workers (safer)
+  npm run pm2:start-8           # 8 workers (fastest)
+  npm run pm2:start-dry         # Dry run (no DB update)
+
+📊 MONITOR
+─────────────────────────────────────────────────────────────────────
+  npm run pm2:monitor           # Check progress
+  npm run pm2:logs              # View logs
+  pm2 monit                     # Interactive dashboard
+  pm2 status                    # Quick status
+
+🛑 CONTROL
+─────────────────────────────────────────────────────────────────────
+  npm run pm2:stop              # Stop workers
+  npm run pm2:delete            # Remove workers
+  pm2 restart attraction-worker # Restart workers
+
+🔄 MERGE RESULTS
+─────────────────────────────────────────────────────────────────────
+  npm run pm2:merge             # Combine worker outputs
+
+📁 OUTPUT FILES
+─────────────────────────────────────────────────────────────────────
+  output/worker-0-results.json  # Worker 0 results
+  output/worker-1-results.json  # Worker 1 results
+  output/worker-2-results.json  # Worker 2 results
+  output/worker-3-results.json  # Worker 3 results
+  output/merged-results.json    # All results combined
+  output/merged-errors.json     # Failed items only
+  output/processing-summary.json # Summary statistics
+
+⚡ PERFORMANCE
+─────────────────────────────────────────────────────────────────────
+  Sequential (1 worker):  ~100/hour → 1000 items in ~10 hours
+  PM2 (4 workers):        ~320/hour → 1000 items in ~3 hours  🚀
+  PM2 (8 workers):        ~500/hour → 1000 items in ~2 hours  🚀🚀
+
+💡 QUICK WORKFLOW
+─────────────────────────────────────────────────────────────────────
+  1. npm run pm2:start          # Start processing
+  2. npm run pm2:monitor        # Check progress
+  3. npm run pm2:merge          # Merge results when done
+
+📖 DOCUMENTATION
+─────────────────────────────────────────────────────────────────────
+  PM2_SETUP_COMPLETE.md  # Setup summary
+  PM2_GUIDE.md           # Complete PM2 guide
+  README.md              # Full documentation
+
+🐛 TROUBLESHOOTING
+─────────────────────────────────────────────────────────────────────
+  pm2 logs --err        # View errors only
+  pm2 logs --lines 100  # View more log history
+  ./monitor-pm2.sh      # Detailed progress
+
+╔══════════════════════════════════════════════════════════════════════╗
+║  Ready? Start with: npm run pm2:start                                ║
+╚══════════════════════════════════════════════════════════════════════╝
