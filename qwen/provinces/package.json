@@ -1,0 +1,16 @@
+{
+  "name": "province-processor",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Process provinces data with Qwen API",
+  "main": "province-generator.js",
+  "scripts": {
+    "test": "node test-query-provinces.js",
+    "generate": "node province-generator.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "openai": "^4.20.1",
+    "dotenv": "^16.3.1"
+  }
+}

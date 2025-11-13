@@ -1,0 +1,16 @@
+{
+  "name": "region-processor",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Process regions data with Qwen API",
+  "main": "region-generator.js",
+  "scripts": {
+    "test": "node test-query-regions.js",
+    "generate": "node region-generator.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "openai": "^4.20.1",
+    "dotenv": "^16.3.1"
+  }
+}
