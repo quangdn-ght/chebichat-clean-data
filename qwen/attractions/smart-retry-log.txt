@@ -1,0 +1,51 @@
+🔄 Smart Retry with Category-based Processing
+
+====================================================================================================
+
+⏭️  Skipping Code 103360 - Highly sensitive political content
+
+
+====================================================================================================
+📂 Processing Category: SIMPLE_HTML (4 items)
+====================================================================================================
+
+📍 Processing: 武汉外语外事职业学院 (Code: 106766) [simple_html]
+====================================================================================================
+   🧹 Cleaned HTML entities (981 → 957 chars)
+   ✅ Generated content (343 words)
+   Vietnamese: Học viện Ngoại ngữ và Ngoại vụ Vũ Hán
+   English: Wuhan Foreign Languages and Foreign Affairs Vocational College
+   💾 Updating database...
+   ✅ Success!
+
+📍 Processing: 哲蚌寺 (Code: 114164) [simple_html]
+====================================================================================================
+   🧹 Cleaned HTML entities (980 → 944 chars)
+   ✅ Generated content (482 words)
+   Vietnamese: Chùa Triết Bạt
+   English: Drepung Monastery
+   💾 Updating database...
+   ✅ Success!
+
+📍 Processing: 罗布林卡 (Code: 114165) [simple_html]
+====================================================================================================
+   🧹 Cleaned HTML entities (982 → 958 chars)
+   ✅ Generated content (425 words)
+   Vietnamese: Lạc Bố Lâm Ka
+   English: Norbulingka
+   💾 Updating database...
+   ✅ Success!
+
+📍 Processing: 永宁禅寺 (Code: 116175) [simple_html]
+====================================================================================================
+   🧹 Cleaned HTML entities (512 → 488 chars)
+   ❌ Failed: 400 Input data may contain inappropriate content.
+
+
+====================================================================================================
+📂 Processing Category: RELIGIOUS (3 items)
+====================================================================================================
+
+📍 Processing: 融水老子山 (Code: 104421) [religious]
+====================================================================================================
+   🧹 Cleaned HTML entities (1241 → 1109 chars)

@@ -1,0 +1,47 @@
+{
+  "processed_successfully_before": [
+    106766,
+    114164,
+    114165
+  ],
+  "success": [
+    {
+      "code": 111797,
+      "name": "东周殉马坑",
+      "wordCount": 533
+    },
+    {
+      "code": 113598,
+      "name": "康定金刚寺",
+      "wordCount": 259
+    }
+  ],
+  "failed": [],
+  "manual_review": [
+    {
+      "code": 103360,
+      "reason": "Political/violent content - massacre memorial"
+    },
+    {
+      "code": 104421,
+      "reason": "Heavy Buddhist/Taoist religious content"
+    },
+    {
+      "code": 107111,
+      "reason": "Historical references to revolution"
+    },
+    {
+      "code": 114427,
+      "reason": "Religious content with deity references"
+    },
+    {
+      "code": 116175,
+      "reason": "Buddhist temple - chanting/religious content"
+    },
+    {
+      "code": 116655,
+      "reason": "Buddhist temple with revolutionary references"
+    }
+  ],
+  "timestamp": "2025-11-13T08:16:14.218Z"
+}

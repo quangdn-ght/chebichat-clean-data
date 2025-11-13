@@ -72,20 +72,37 @@ async function processWork() {
       process.exit(0);
     }
 
-    // Fetch this worker's batch
-    const { data: attractions, error } = await supabase
-      .from('attractions')
-      .select('id, attraction_code, name, description, province_id, region_id, category_id')
-      .not('description', 'is', null)
-      .is('description_vi', null)
-      .order('attraction_code', { ascending: true })
-      .range(startIndex, endIndex - 1);
+    // Fetch this worker's batch (handle Supabase 1000-row limit with pagination)
+    const attractions = [];
+    const pageSize = 1000;
+    const totalToFetch = endIndex - startIndex;
+    
+    for (let offset = 0; offset < totalToFetch; offset += pageSize) {
+      const fetchEnd = Math.min(startIndex + offset + pageSize - 1, endIndex - 1);
+      
+      console.log(`📥 Worker ${WORKER_ID}: Fetching rows ${startIndex + offset} to ${fetchEnd + 1}`);
+      
+      const { data, error } = await supabase
+        .from('attractions')
+        .select('id, attraction_code, name, description, province_id, region_id, category_id')
+        .not('description', 'is', null)
+        .is('description_vi', null)
+        .order('attraction_code', { ascending: true })
+        .range(startIndex + offset, fetchEnd);
 
-    if (error) {
-      throw new Error(`Failed to fetch attractions: ${error.message}`);
+      if (error) {
+        throw new Error(`Failed to fetch attractions: ${error.message}`);
+      }
+      
+      attractions.push(...data);
+      
+      // Break if we got fewer items than requested (reached end)
+      if (data.length < pageSize) {
+        break;
+      }
     }
 
-    console.log(`📦 Worker ${WORKER_ID}: Processing ${attractions.length} attractions`);
+    console.log(`📦 Worker ${WORKER_ID}: Processing ${attractions.length} attractions (expected ${totalToFetch})`);
 
     const results = {
       workerId: WORKER_ID,

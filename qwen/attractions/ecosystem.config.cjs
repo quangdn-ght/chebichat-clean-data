@@ -3,11 +3,11 @@ module.exports = {
     {
       name: 'attraction-worker',
       script: './worker.js',
-      instances: 10,
+      instances: 2,
       exec_mode: 'cluster',
       env: {
         NODE_ENV: 'production',
-        TOTAL_WORKERS: 10,
+        TOTAL_WORKERS: 2,
         BATCH_SIZE: 50,
         UPDATE_DB: 'true'
       },

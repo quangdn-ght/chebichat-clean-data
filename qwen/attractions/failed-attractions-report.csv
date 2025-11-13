@@ -1,0 +1,12 @@
+Code,Name,Length,Issues
+103360,"沙基惨案纪念碑",361,"Sensitive keywords: 惨案; 屠杀; 军队; 开枪; 死; 帝国主义; 杀; 运动; 罢工; 示威; 抗议"
+104421,"融水老子山",1241,"Contains HTML entities | Contains many special characters: &"
+106766,"武汉外语外事职业学院",981,"Contains HTML entities"
+107111,"湖南大学",2600,"Sensitive keywords: 革命; 运动 | Contains many special characters: “”"
+111797,"东周殉马坑",1199,"Sensitive keywords: 死 | Contains HTML entities"
+113598,"康定金刚寺",4268,"Sensitive keywords: 运动 | Contains HTML entities | Very long description (>3000 chars) | Contains many special characters: &""
+114164,"哲蚌寺",980,"Contains HTML entities"
+114165,"罗布林卡",982,"Contains HTML entities"
+114427,"拉母拉错湖",935,"Sensitive keywords: 运动 | Contains HTML entities | Contains many special characters: &"
+116175,"永宁禅寺",512,"Contains HTML entities"
+116655,"西天寺",1404,"Sensitive keywords: 革命 | Contains HTML entities | Contains many special characters: &"
